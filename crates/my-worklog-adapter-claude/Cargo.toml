@@ -1,0 +1,9 @@
+[package]
+name = "my-worklog-adapter-claude"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+my-worklog-core = { path = "../my-worklog-core" }

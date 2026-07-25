@@ -1,0 +1,94 @@
+mod commands;
+
+use std::path::PathBuf;
+
+use anyhow::Result;
+use clap::{Parser, Subcommand};
+use tracing::Level;
+use tracing_subscriber::EnvFilter;
+
+use crate::commands::Context;
+
+#[derive(Debug, Parser)]
+#[command(
+    name = "my-worklog",
+    version,
+    about = "Local-first coding-agent work journal",
+    long_about = "Local-first coding-agent work journal. Normal commands are human-readable; raw provider data is available through explicit export commands."
+)]
+struct Cli {
+    #[arg(
+        long,
+        global = true,
+        env = "MY_WORKLOG_HOME",
+        help = "Override the my-worklog home directory"
+    )]
+    home: Option<PathBuf>,
+    #[arg(short, long, action = clap::ArgAction::Count, global = true, help = "Increase log verbosity (-v, -vv, -vvv)")]
+    verbose: u8,
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Debug, Subcommand)]
+enum Command {
+    #[command(about = "Initialize local my-worklog storage")]
+    Init,
+    #[command(about = "Check local my-worklog configuration and database health")]
+    Doctor,
+    #[command(about = "Clean imported noise from local storage")]
+    Cleanup(commands::cleanup::CleanupArgs),
+    #[command(about = "Export raw stored data explicitly")]
+    Export(commands::export::ExportArgs),
+    #[command(about = "Install coding-agent integrations")]
+    Install(commands::install::InstallArgs),
+    #[command(about = "Import captured work events or agent transcripts")]
+    Import(commands::import::ImportArgs),
+    #[command(about = "Show today's human-readable work report")]
+    Today,
+    #[command(about = "Show yesterday's human-readable work report")]
+    Yesterday,
+    #[command(about = "Show this week's human-readable work report")]
+    Week,
+    #[command(about = "Search human-readable work events")]
+    Search(commands::search::SearchArgs),
+    #[command(about = "Use an LLM to turn a report into shareable prose")]
+    Share(commands::share::ShareArgs),
+}
+
+fn main() -> Result<()> {
+    let cli = Cli::parse();
+    init_tracing(cli.verbose);
+    let context = Context::resolve(cli.home)?;
+    match cli.command {
+        Command::Init => commands::init::run(&context),
+        Command::Doctor => commands::doctor::run(&context),
+        Command::Cleanup(args) => commands::cleanup::run(&context, &args),
+        Command::Export(args) => commands::export::run(&context, &args),
+        Command::Install(args) => commands::install::run(&context, &args),
+        Command::Import(args) => commands::import::run(&context, &args),
+        Command::Today => commands::today::run(&context),
+        Command::Yesterday => commands::yesterday::run(&context),
+        Command::Week => commands::week::run(&context),
+        Command::Search(args) => commands::search::run(&context, &args),
+        Command::Share(args) => commands::share::run(&context, &args),
+    }
+}
+
+fn init_tracing(verbose: u8) {
+    let level = match verbose {
+        0 => Level::WARN,
+        1 => Level::INFO,
+        2 => Level::DEBUG,
+        _ => Level::TRACE,
+    };
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new(format!("my_worklog={level}")));
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_target(false)
+        .without_time()
+        .compact()
+        .with_writer(std::io::stderr)
+        .init();
+}

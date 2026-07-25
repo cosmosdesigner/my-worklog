@@ -1,0 +1,25 @@
+[package]
+name = "my-worklog-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "my-worklog"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+directories.workspace = true
+my-worklog-adapter-opencode = { path = "../my-worklog-adapter-opencode" }
+my-worklog-core = { path = "../my-worklog-core" }
+my-worklog-summarizer = { path = "../my-worklog-summarizer" }
+rusqlite.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -1,0 +1,1 @@
+{"source_agent":"codex","source_session_id":"codex-fixture","source_event_id":"1","type":"command","timestamp":"2026-07-23T10:00:00Z","cwd":"/tmp/my-worklog-fixture","project_root":"/tmp/my-worklog-fixture","title":"Ran cargo tests","content":"cargo test exposed a database migration issue","command":"cargo test"}

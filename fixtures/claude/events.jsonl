@@ -1,0 +1,1 @@
+{"source_agent":"claude","source_session_id":"claude-fixture","source_event_id":"1","type":"decision","timestamp":"2026-07-24T11:00:00Z","cwd":"/tmp/my-worklog-fixture","project_root":"/tmp/my-worklog-fixture","title":"Decided local-first reports","content":"We will use heuristic summaries before external memory features."}

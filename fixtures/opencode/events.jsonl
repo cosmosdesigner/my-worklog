@@ -1,0 +1,1 @@
+{"source_agent":"opencode","source_session_id":"opencode-fixture","source_event_id":"1","type":"user_prompt","timestamp":"2026-07-24T09:00:00Z","cwd":"/tmp/my-worklog-fixture","project_root":"/tmp/my-worklog-fixture","title":"Investigated SQLite import","content":"Need to build database migration and redact OPENAI_API_KEY=sk-secret"}
