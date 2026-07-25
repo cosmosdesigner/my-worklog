@@ -16,6 +16,62 @@ my-worklog export events --jsonl
 my-worklog share yesterday
 ```
 
+## Install
+
+Clone the repository and install the CLI binary with Cargo:
+
+```bash
+git clone git@github.com:cosmosdesigner/my-worklog.git
+cd my-worklog
+cargo install --path crates/my-worklog-cli
+```
+
+This installs the `my-worklog` command into Cargo's binary directory, usually
+`~/.cargo/bin`. Make sure that directory is on your `PATH`:
+
+```bash
+my-worklog --help
+```
+
+Install the OpenCode integration globally so it is available from any OpenCode
+project/session:
+
+```bash
+my-worklog install opencode --global
+```
+
+Preview the files before writing them:
+
+```bash
+my-worklog install opencode --global --dry-run
+```
+
+If an older installation already exists, overwrite it with timestamped backups:
+
+```bash
+my-worklog install opencode --global --force
+```
+
+Restart OpenCode after installation. The global install writes the plugin and
+helper tools into OpenCode's global config directory, including:
+
+```text
+plugins/my-worklog.ts
+tools/worklog_today.ts
+tools/worklog_yesterday.ts
+tools/worklog_week.ts
+tools/worklog_decisions.ts
+tools/worklog_open_loops.ts
+```
+
+Initialize and import local OpenCode history when needed:
+
+```bash
+my-worklog init
+my-worklog import --opencode
+my-worklog yesterday
+```
+
 It stores normalized, redacted local data in SQLite under `~/.my-worklog/` by default.
 Set `MY_WORKLOG_HOME=/custom/path` to override the home directory.
 
