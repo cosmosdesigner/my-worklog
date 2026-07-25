@@ -2,7 +2,7 @@
 
 `my-worklog` is a local-first developer work journal for coding-agent sessions.
 
-Phase 1 implements:
+Current commands include:
 
 ```bash
 my-worklog init
@@ -12,6 +12,12 @@ my-worklog today
 my-worklog yesterday
 my-worklog week
 my-worklog search "database migration"
+my-worklog decisions --period yesterday
+my-worklog open-loops --period week
+my-worklog blockers --period week
+my-worklog files --period week
+my-worklog commands --period yesterday
+my-worklog agents --period week
 my-worklog export events --jsonl
 my-worklog share yesterday
 ```
@@ -78,6 +84,23 @@ Set `MY_WORKLOG_HOME=/custom/path` to override the home directory.
 Normal report commands are human-readable by default. `today`, `yesterday`, `week`, and
 `search` summarize stored work events and hide raw provider payloads such as OpenCode
 metadata JSON.
+
+Local insight commands are deterministic and do not call an LLM:
+
+```bash
+my-worklog decisions --period today
+my-worklog decisions --period yesterday
+my-worklog decisions --period week
+my-worklog open-loops --period week
+my-worklog blockers --period week
+my-worklog files --period week
+my-worklog commands --period week
+my-worklog agents --period week
+```
+
+`--period` supports `today`, `yesterday`, and `week`. The default is `week`.
+These commands read local SQLite data, filter human-readable events, and include
+available metrics such as event counts, total time, and token usage.
 
 Raw event data remains available explicitly for debugging or machine export:
 

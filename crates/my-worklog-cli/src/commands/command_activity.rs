@@ -13,6 +13,9 @@ pub struct Args {
 
 pub fn run(context: &Context, args: &Args) -> Result<()> {
     let db = WorklogDb::open_existing(context.paths.database())?;
-    println!("{}", insights::agents(db.connection(), args.period.into())?);
+    println!(
+        "{}",
+        insights::commands(db.connection(), args.period.into())?
+    );
     Ok(())
 }

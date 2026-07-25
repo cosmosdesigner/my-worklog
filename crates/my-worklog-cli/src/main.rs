@@ -54,6 +54,21 @@ enum Command {
     Search(commands::search::SearchArgs),
     #[command(about = "Use an LLM to turn a report into shareable prose")]
     Share(commands::share::ShareArgs),
+    #[command(about = "Show decisions found in local work events")]
+    Decisions(commands::decisions::Args),
+    #[command(
+        name = "open-loops",
+        about = "Show open loops found in local work events"
+    )]
+    OpenLoops(commands::open_loops::Args),
+    #[command(about = "Show blockers found in local work events")]
+    Blockers(commands::blockers::Args),
+    #[command(about = "Show file activity found in local work events")]
+    Files(commands::files::Args),
+    #[command(about = "Show command activity found in local work events")]
+    Commands(commands::command_activity::Args),
+    #[command(about = "Show source-agent activity counts")]
+    Agents(commands::agents::Args),
 }
 
 fn main() -> Result<()> {
@@ -72,6 +87,12 @@ fn main() -> Result<()> {
         Command::Week => commands::week::run(&context),
         Command::Search(args) => commands::search::run(&context, &args),
         Command::Share(args) => commands::share::run(&context, &args),
+        Command::Decisions(args) => commands::decisions::run(&context, &args),
+        Command::OpenLoops(args) => commands::open_loops::run(&context, &args),
+        Command::Blockers(args) => commands::blockers::run(&context, &args),
+        Command::Files(args) => commands::files::run(&context, &args),
+        Command::Commands(args) => commands::command_activity::run(&context, &args),
+        Command::Agents(args) => commands::agents::run(&context, &args),
     }
 }
 
