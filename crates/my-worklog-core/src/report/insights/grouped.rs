@@ -55,6 +55,35 @@ pub(super) fn done_compact(period: ReportPeriod, events: &[StoredEvent]) -> Stri
 }
 
 pub(super) fn status(period: ReportPeriod, events: &[StoredEvent], options: TextOptions) -> String {
+    status_with(
+        period,
+        events,
+        options,
+        super::is_blocker,
+        super::is_decision,
+        super::is_open_loop,
+    )
+}
+
+pub(super) fn status_compact(period: ReportPeriod, events: &[StoredEvent]) -> String {
+    status_with(
+        period,
+        events,
+        TextOptions::COMPACT,
+        super::is_compact_blocker,
+        super::is_compact_decision,
+        super::is_compact_open_loop,
+    )
+}
+
+fn status_with(
+    period: ReportPeriod,
+    events: &[StoredEvent],
+    options: TextOptions,
+    is_blocker: fn(&StoredEvent) -> bool,
+    is_decision: fn(&StoredEvent) -> bool,
+    is_open_loop: fn(&StoredEvent) -> bool,
+) -> String {
     let metrics = event_metrics(events);
     let duration = metrics
         .duration_label()
@@ -75,17 +104,17 @@ pub(super) fn status(period: ReportPeriod, events: &[StoredEvent], options: Text
     section(
         &mut output,
         "Blockers",
-        text_items(events, super::is_blocker, options),
+        text_items(events, is_blocker, options),
     );
     section(
         &mut output,
         "Decisions",
-        text_items(events, super::is_decision, options),
+        text_items(events, is_decision, options),
     );
     section(
         &mut output,
         "Open loops",
-        text_items(events, super::is_open_loop, options),
+        text_items(events, is_open_loop, options),
     );
     section(&mut output, "Completed work", done_items(events, options));
     section(&mut output, "Files", file_items(events, 5));

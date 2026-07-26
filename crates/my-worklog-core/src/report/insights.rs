@@ -78,11 +78,7 @@ pub fn status(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> 
 
 pub fn status_compact(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> {
     let events = period_events(conn, period)?;
-    Ok(grouped::status(
-        period,
-        &events,
-        grouped::TextOptions::COMPACT,
-    ))
+    Ok(grouped::status_compact(period, &events))
 }
 
 fn period_events(conn: &Connection, period: ReportPeriod) -> WorklogResult<Vec<StoredEvent>> {
@@ -139,6 +135,42 @@ fn is_blocker(event: &StoredEvent) -> bool {
         && contains_any(
             event,
             &["blocked", "blocker", "cannot", "can't", "failed", "error"],
+        )
+}
+
+fn is_compact_decision(event: &StoredEvent) -> bool {
+    !is_meta_dump(event)
+        && text_starts_with_any(event, &["decision:", "decided:", "we decided", "i decided"])
+}
+
+fn is_compact_open_loop(event: &StoredEvent) -> bool {
+    !is_meta_dump(event)
+        && text_starts_with_any(
+            event,
+            &[
+                "todo:",
+                "open loop:",
+                "follow up:",
+                "follow-up:",
+                "next:",
+                "next step:",
+                "remaining:",
+            ],
+        )
+}
+
+fn is_compact_blocker(event: &StoredEvent) -> bool {
+    !is_meta_dump(event)
+        && text_starts_with_any(
+            event,
+            &[
+                "blocker:",
+                "blocked:",
+                "blocked by",
+                "blocked on",
+                "cannot proceed",
+                "can't proceed",
+            ],
         )
 }
 
@@ -199,6 +231,16 @@ fn contains_any(event: &StoredEvent, needles: &[&str]) -> bool {
     )
     .to_lowercase();
     needles.iter().any(|needle| haystack.contains(needle))
+}
+
+fn text_starts_with_any(event: &StoredEvent, prefixes: &[&str]) -> bool {
+    event
+        .title
+        .as_deref()
+        .into_iter()
+        .chain(event.content.as_deref())
+        .map(|text| text.trim_start().to_lowercase())
+        .any(|text| prefixes.iter().any(|prefix| text.starts_with(prefix)))
 }
 
 impl ReportPeriod {
