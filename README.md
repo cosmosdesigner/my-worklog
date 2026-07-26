@@ -1,30 +1,72 @@
 # MyWorklog
 
-`my-worklog` is a local-first developer work journal for coding-agent sessions.
+MyWorklog turns your OpenCode sessions into a private work memory you can ask about.
 
-Current commands include:
+Instead of digging through chat transcripts, terminal scrollback, and half-remembered task notes, install the OpenCode plugin and ask plain questions like:
 
-```bash
-my-worklog init
-my-worklog doctor
-my-worklog import --spool
-my-worklog today
-my-worklog yesterday
-my-worklog week
-my-worklog search "database migration"
-my-worklog status --period week --compact
-my-worklog done --period week --compact
-my-worklog decisions --period yesterday
-my-worklog open-loops --period week
-my-worklog blockers --period week
-my-worklog files --period week
-my-worklog commands --period yesterday
-my-worklog agents --period week
-my-worklog export events --jsonl
-my-worklog share yesterday
+```text
+What did I do today?
+What shipped this week?
+What blockers came up?
+What decisions did we make yesterday?
+What files changed during the refactor?
+What commands did I run while debugging?
 ```
 
-## Install
+The plugin records local, redacted work events while you code. The CLI imports those events into a local SQLite database and produces deterministic reports for daily standups, weekly reviews, handoffs, and status checks.
+
+## Why It Helps
+
+Coding-agent work moves fast. Important context often lives across prompts, tool calls, file edits, commands, and agent summaries. MyWorklog gives that work a durable shape:
+
+- See what happened today, yesterday, or this week.
+- Pull out completed work, blockers, decisions, and open loops.
+- Review files, commands, and source-agent activity without reading raw transcripts.
+- Give OpenCode compact answers that are short enough to paste into a chat.
+- Turn a local report into a manager or client update only when you ask for it.
+
+## What the OpenCode Plugin Does
+
+The OpenCode integration installs a plugin plus helper tools into OpenCode's global config directory. During OpenCode sessions, the plugin writes local redacted events to:
+
+```text
+~/.my-worklog/spool/opencode/events.jsonl
+```
+
+Then `my-worklog import --opencode` imports local OpenCode history into SQLite under `~/.my-worklog/` by default. Set `MY_WORKLOG_HOME=/custom/path` to use a different home directory.
+
+Helper tools installed for OpenCode include:
+
+```text
+plugins/my-worklog.ts
+tools/worklog_today.ts
+tools/worklog_yesterday.ts
+tools/worklog_week.ts
+tools/worklog_status.ts
+tools/worklog_done.ts
+tools/worklog_decisions.ts
+tools/worklog_open_loops.ts
+tools/worklog_blockers.ts
+tools/worklog_files.ts
+tools/worklog_commands.ts
+tools/worklog_agents.ts
+```
+
+`worklog_status` and `worklog_done` support compact answers for OpenCode, so questions like "what happened this week?" or "what got done today?" can stay brief.
+
+## Local-First Privacy
+
+Normal reports stay local and deterministic. Commands such as `today`, `week`, `status`, `done`, `decisions`, `open-loops`, `blockers`, `files`, `commands`, and `agents` read from local SQLite and don't call an LLM.
+
+Raw event export is explicit:
+
+```bash
+my-worklog export events --jsonl
+```
+
+LLM wording is opt-in through `share`. `share` sends the already human-readable report text, not raw provider payloads, to the selected provider. Use it when you want a polished manager update, client note, or external summary.
+
+## Quick Install
 
 Clone the repository and install the CLI binary with Cargo:
 
@@ -34,15 +76,13 @@ cd my-worklog
 cargo install --path crates/my-worklog-cli
 ```
 
-This installs the `my-worklog` command into Cargo's binary directory, usually
-`~/.cargo/bin`. Make sure that directory is on your `PATH`:
+This installs `my-worklog` into Cargo's binary directory, usually `~/.cargo/bin`. Make sure that directory is on your `PATH`:
 
 ```bash
 my-worklog --help
 ```
 
-Install the OpenCode integration globally so it is available from any OpenCode
-project/session:
+Install the OpenCode integration globally so it is available from any OpenCode project or session:
 
 ```bash
 my-worklog install opencode --global
@@ -60,25 +100,7 @@ If an older installation already exists, overwrite it with timestamped backups:
 my-worklog install opencode --global --force
 ```
 
-Restart OpenCode after installation. The global install writes the plugin and
-helper tools into OpenCode's global config directory, including:
-
-```text
-plugins/my-worklog.ts
-tools/worklog_today.ts
-tools/worklog_yesterday.ts
-tools/worklog_week.ts
-tools/worklog_status.ts
-tools/worklog_done.ts
-tools/worklog_decisions.ts
-tools/worklog_open_loops.ts
-tools/worklog_blockers.ts
-tools/worklog_files.ts
-tools/worklog_commands.ts
-tools/worklog_agents.ts
-```
-
-Initialize and import local OpenCode history when needed:
+Restart OpenCode after installation. Then initialize and import local OpenCode history when needed:
 
 ```bash
 my-worklog init
@@ -86,14 +108,18 @@ my-worklog import --opencode
 my-worklog yesterday
 ```
 
-It stores normalized, redacted local data in SQLite under `~/.my-worklog/` by default.
-Set `MY_WORKLOG_HOME=/custom/path` to override the home directory.
+## Daily Use
 
-Normal report commands are human-readable by default. `today`, `yesterday`, `week`, and
-`search` summarize stored work events and hide raw provider payloads such as OpenCode
-metadata JSON.
+Use period reports for quick recall:
 
-Local insight commands are deterministic and do not call an LLM:
+```bash
+my-worklog today
+my-worklog yesterday
+my-worklog week
+my-worklog search "database migration"
+```
+
+Use focused insight commands when you need a specific angle:
 
 ```bash
 my-worklog status --period today
@@ -110,47 +136,33 @@ my-worklog commands --period week
 my-worklog agents --period week
 ```
 
-`--period` supports `today`, `yesterday`, and `week`. The default is `week`.
-`status` defaults to `today`; the other insight commands default to `week`.
-These commands read local SQLite data, filter/group human-readable events, and
-include available metrics such as event counts, total time, and token usage.
-`done` answers what completed in the selected period. `status` gives a compact
-dashboard with blockers, decisions, open loops, completed work, file activity,
-command activity, and source-agent counts. Add `--compact` to `status` or `done`
-for shorter top-item lists and truncated bullets suitable for OpenCode answers.
+`--period` supports `today`, `yesterday`, and `week`. The default is `week`. `status` defaults to `today`; the other insight commands default to `week`.
 
-Raw event data remains available explicitly for debugging or machine export:
+These commands filter and group human-readable events, then include available metrics such as event counts, total time, and token usage. `done` answers what completed in the selected period. `status` gives a dashboard with blockers, decisions, open loops, completed work, file activity, command activity, and source-agent counts. Add `--compact` to `status` or `done` for shorter top-item lists and truncated bullets suitable for OpenCode answers.
+
+## CLI Reference
+
+Common commands:
 
 ```bash
+my-worklog init
+my-worklog doctor
+my-worklog import --spool
+my-worklog import --opencode
+my-worklog today
+my-worklog yesterday
+my-worklog week
+my-worklog search "database migration"
+my-worklog status --period week --compact
+my-worklog done --period week --compact
+my-worklog decisions --period yesterday
+my-worklog open-loops --period week
+my-worklog blockers --period week
+my-worklog files --period week
+my-worklog commands --period yesterday
+my-worklog agents --period week
 my-worklog export events --jsonl
-```
-
-LLM summaries are opt-in through `share`. Normal reports stay local and deterministic.
-`share` sends the already human-readable report text, not raw provider payloads, to the
-selected provider.
-
-Recommended setup:
-
-```bash
-export OPENAI_API_KEY="..."
 my-worklog share yesterday
-```
-
-The default provider is OpenAI with `gpt-5.6`, chosen for high-quality concise writing
-when turning a worklog into a manager/client update. DeepSeek is available through its
-OpenAI-compatible chat API with `deepseek-v4-pro`:
-
-```bash
-export DEEPSEEK_API_KEY="..."
-my-worklog share yesterday --provider deep-seek
-```
-
-Defaults can be overridden when needed:
-
-```bash
-my-worklog share today --audience client
-my-worklog share week --provider open-ai --model gpt-5.6
-my-worklog share yesterday --provider deep-seek --model deepseek-v4-pro
 ```
 
 Every command exposes CLI help:
@@ -159,6 +171,32 @@ Every command exposes CLI help:
 my-worklog --help
 my-worklog import --help
 my-worklog share --help
+```
+
+## Optional LLM Share Reports
+
+Normal report commands don't call an LLM. When you want polished wording, configure a provider and call `share`.
+
+Recommended OpenAI setup:
+
+```bash
+export OPENAI_API_KEY="..."
+my-worklog share yesterday
+```
+
+The default provider is OpenAI with `gpt-5.6`, chosen for concise report writing. DeepSeek is available through its OpenAI-compatible chat API with `deepseek-v4-pro`:
+
+```bash
+export DEEPSEEK_API_KEY="..."
+my-worklog share yesterday --provider deep-seek
+```
+
+Defaults can be changed when needed:
+
+```bash
+my-worklog share today --audience client
+my-worklog share week --provider open-ai --model gpt-5.6
+my-worklog share yesterday --provider deep-seek --model deepseek-v4-pro
 ```
 
 Before spending LLM tokens, preview the exact prompt that would be sent:
