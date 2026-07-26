@@ -179,3 +179,65 @@ fn done_report_groups_completed_work_and_status_includes_it() {
     assert!(status.contains("## Completed work"));
     assert!(status.contains("Completed: added local status dashboard (2 events) [opencode]"));
 }
+
+#[test]
+fn compact_done_and_status_skip_meta_dumps_and_truncate_items() {
+    let dir = tempdir().expect("tempdir");
+    let spool = dir.path().join("spool/opencode");
+    fs::create_dir_all(&spool).expect("create spool");
+    let yesterday = Local::now().date_naive() - Days::new(1);
+    let timestamp = |hour: u32, minute: u32| {
+        Local
+            .with_ymd_and_hms(
+                yesterday.year(),
+                yesterday.month(),
+                yesterday.day(),
+                hour,
+                minute,
+                0,
+            )
+            .single()
+            .expect("valid local fixture time")
+            .with_timezone(&chrono::Utc)
+            .to_rfc3339()
+    };
+    fs::write(
+        spool.join("events.jsonl"),
+        format!(
+            "{{\"source_agent\":\"opencode\",\"source_session_id\":\"s4\",\"source_event_id\":\"meta\",\"type\":\"assistant_message\",\"role\":\"assistant\",\"timestamp\":\"{}\",\"content\":\"Implementation Plan: completed architecture summary with Cargo.toml crates/my-worklog-core/src/report/markdown.rs tests fixtures and a very long planning dump that should not be classified as completed work\"}}\n{{\"source_agent\":\"opencode\",\"source_session_id\":\"s4\",\"source_event_id\":\"plan_tag\",\"type\":\"assistant_message\",\"role\":\"assistant\",\"timestamp\":\"{}\",\"content\":\"<plan> # OpenCode Transcript Import Plan ## Context User Request Summary: plan a read-only import and next implementation steps\"}}\n{{\"source_agent\":\"opencode\",\"source_session_id\":\"s4\",\"source_event_id\":\"analysis_tag\",\"type\":\"assistant_message\",\"role\":\"assistant\",\"timestamp\":\"{}\",\"content\":\"<analysis> Literal Request: inspect the Rust workspace read-only, focusing on phase work and deciding what to implement next\"}}\n{{\"source_agent\":\"opencode\",\"source_session_id\":\"s4\",\"source_event_id\":\"advice\",\"type\":\"assistant_message\",\"role\":\"assistant\",\"timestamp\":\"{}\",\"content\":\"Recommended shape: use clap derive Parser Subcommand Args for typed commands and keep report generation pure and time-bounded, with fixed timestamps in tests and complete validation gates\"}}\n{{\"source_agent\":\"opencode\",\"source_session_id\":\"s4\",\"source_event_id\":\"reminder\",\"type\":\"user_prompt\",\"role\":\"user\",\"timestamp\":\"{}\",\"content\":\"<system-reminder> Completed background task. Continue if you have next steps or stop if blocked.\"}}\n{{\"source_agent\":\"opencode\",\"source_session_id\":\"s4\",\"source_event_id\":\"done\",\"type\":\"assistant_message\",\"role\":\"assistant\",\"timestamp\":\"{}\",\"content\":\"Completed: implemented compact status output with top sections, short bullets, OpenCode helper defaults, README updates, regression tests, and validation gates for the local worklog CLI\"}}\n{{\"source_agent\":\"opencode\",\"source_session_id\":\"s4\",\"source_event_id\":\"decision\",\"type\":\"assistant_message\",\"role\":\"assistant\",\"timestamp\":\"{}\",\"content\":\"Decision: keep compact insights deterministic and local-only\"}}\n",
+            timestamp(1, 0),
+            timestamp(1, 1),
+            timestamp(1, 2),
+            timestamp(1, 3),
+            timestamp(1, 4),
+            timestamp(1, 5),
+            timestamp(1, 6)
+        ),
+    )
+    .expect("write fixture");
+    let db = WorklogDb::open(&dir.path().join("worklog.sqlite")).expect("open db");
+    let redactor = Redactor::new(None).expect("redactor");
+    import_spool(db.connection(), &dir.path().join("spool"), &redactor).expect("import");
+
+    let done = insights::done_compact(db.connection(), ReportPeriod::Yesterday).expect("done");
+    let status =
+        insights::status_compact(db.connection(), ReportPeriod::Yesterday).expect("status");
+
+    assert!(done.contains("# Done - yesterday"));
+    assert!(done.contains("Completed: implemented compact status output"));
+    assert!(done.contains("... [opencode]"));
+    assert!(!done.contains("Implementation Plan"));
+    assert!(!done.contains("Cargo.toml"));
+    assert!(!done.contains("<analysis>"));
+    assert!(!done.contains("<plan>"));
+    assert!(!done.contains("Recommended shape"));
+    assert!(status.contains("# Status - yesterday"));
+    assert!(status.contains("## Completed work"));
+    assert!(status.contains("## Decisions"));
+    assert!(!status.contains("Implementation Plan"));
+    assert!(!status.contains("<analysis>"));
+    assert!(!status.contains("<plan>"));
+    assert!(!status.contains("system-reminder"));
+    assert!(!status.contains("Recommended shape"));
+    assert!(!status.contains("regression tests, and validation gates"));
+}

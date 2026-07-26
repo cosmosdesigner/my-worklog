@@ -12,8 +12,8 @@ my-worklog today
 my-worklog yesterday
 my-worklog week
 my-worklog search "database migration"
-my-worklog status --period today
-my-worklog done --period week
+my-worklog status --period week --compact
+my-worklog done --period week --compact
 my-worklog decisions --period yesterday
 my-worklog open-loops --period week
 my-worklog blockers --period week
@@ -97,7 +97,9 @@ Local insight commands are deterministic and do not call an LLM:
 
 ```bash
 my-worklog status --period today
+my-worklog status --period week --compact
 my-worklog done --period week
+my-worklog done --period week --compact
 my-worklog decisions --period today
 my-worklog decisions --period yesterday
 my-worklog decisions --period week
@@ -114,7 +116,8 @@ These commands read local SQLite data, filter/group human-readable events, and
 include available metrics such as event counts, total time, and token usage.
 `done` answers what completed in the selected period. `status` gives a compact
 dashboard with blockers, decisions, open loops, completed work, file activity,
-command activity, and source-agent counts.
+command activity, and source-agent counts. Add `--compact` to `status` or `done`
+for shorter top-item lists and truncated bullets suitable for OpenCode answers.
 
 Raw event data remains available explicitly for debugging or machine export:
 

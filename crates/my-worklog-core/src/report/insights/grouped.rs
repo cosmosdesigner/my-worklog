@@ -6,6 +6,7 @@ use crate::db::repositories::StoredEvent;
 use crate::report::display::event_metrics;
 use crate::report::insights::ReportPeriod;
 
+pub(super) use self::items::TextOptions;
 use self::items::{count_items, text_items};
 
 pub(super) fn text_report(
@@ -13,9 +14,14 @@ pub(super) fn text_report(
     period: ReportPeriod,
     events: &[StoredEvent],
     predicate: impl Fn(&StoredEvent) -> bool,
-    limit: usize,
+    options: TextOptions,
 ) -> String {
-    report(title, period, events, text_items(events, predicate, limit))
+    report(
+        title,
+        period,
+        events,
+        text_items(events, predicate, options),
+    )
 }
 
 pub(super) fn file_report(period: ReportPeriod, events: &[StoredEvent], limit: usize) -> String {
@@ -30,11 +36,25 @@ pub(super) fn agent_report(period: ReportPeriod, events: &[StoredEvent], limit: 
     report("Agents", period, events, agent_items(events, limit))
 }
 
-pub(super) fn done_report(period: ReportPeriod, events: &[StoredEvent], limit: usize) -> String {
-    report("Done", period, events, done_items(events, limit))
+pub(super) fn done_report(period: ReportPeriod, events: &[StoredEvent]) -> String {
+    report(
+        "Done",
+        period,
+        events,
+        done_items(events, TextOptions::FULL),
+    )
 }
 
-pub(super) fn status(period: ReportPeriod, events: &[StoredEvent]) -> String {
+pub(super) fn done_compact(period: ReportPeriod, events: &[StoredEvent]) -> String {
+    report(
+        "Done",
+        period,
+        events,
+        done_items(events, TextOptions::COMPACT),
+    )
+}
+
+pub(super) fn status(period: ReportPeriod, events: &[StoredEvent], options: TextOptions) -> String {
     let metrics = event_metrics(events);
     let duration = metrics
         .duration_label()
@@ -55,19 +75,19 @@ pub(super) fn status(period: ReportPeriod, events: &[StoredEvent]) -> String {
     section(
         &mut output,
         "Blockers",
-        text_items(events, super::is_blocker, 5),
+        text_items(events, super::is_blocker, options),
     );
     section(
         &mut output,
         "Decisions",
-        text_items(events, super::is_decision, 5),
+        text_items(events, super::is_decision, options),
     );
     section(
         &mut output,
         "Open loops",
-        text_items(events, super::is_open_loop, 5),
+        text_items(events, super::is_open_loop, options),
     );
-    section(&mut output, "Completed work", done_items(events, 5));
+    section(&mut output, "Completed work", done_items(events, options));
     section(&mut output, "Files", file_items(events, 5));
     section(&mut output, "Commands", command_items(events, 5));
     section(&mut output, "Agents", agent_items(events, 5));
@@ -113,8 +133,8 @@ fn results(output: &mut String, title: &str, items: Vec<String>) {
     }
 }
 
-fn done_items(events: &[StoredEvent], limit: usize) -> Vec<String> {
-    text_items(events, super::is_done, limit)
+fn done_items(events: &[StoredEvent], options: TextOptions) -> Vec<String> {
+    text_items(events, super::is_done, options)
 }
 
 fn file_items(events: &[StoredEvent], limit: usize) -> Vec<String> {

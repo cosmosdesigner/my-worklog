@@ -9,10 +9,17 @@ use crate::commands::{Context, PeriodArg};
 pub struct Args {
     #[arg(long, value_enum, default_value_t = PeriodArg::Week)]
     pub period: PeriodArg,
+    #[arg(long)]
+    pub compact: bool,
 }
 
 pub fn run(context: &Context, args: &Args) -> Result<()> {
     let db = WorklogDb::open_existing(context.paths.database())?;
-    println!("{}", insights::done(db.connection(), args.period.into())?);
+    let report = if args.compact {
+        insights::done_compact(db.connection(), args.period.into())?
+    } else {
+        insights::done(db.connection(), args.period.into())?
+    };
+    println!("{report}");
     Ok(())
 }

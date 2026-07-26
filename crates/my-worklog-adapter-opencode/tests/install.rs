@@ -67,16 +67,17 @@ fn install_writes_plugin_and_tools() {
 
     let status_tool = std::fs::read_to_string(dir.path().join(".opencode/tools/worklog_status.ts"))
         .expect("read status tool");
-    assert!(status_tool.contains("status --period today"));
+    assert!(status_tool.contains("status --period week --compact"));
 
     let command_tool =
         std::fs::read_to_string(dir.path().join(".opencode/tools/worklog_commands.ts"))
             .expect("read commands tool");
     let done_tool = std::fs::read_to_string(dir.path().join(".opencode/tools/worklog_done.ts"))
         .expect("read done tool");
-    assert!(done_tool.contains("done --period week"));
+    assert!(done_tool.contains("done --period week --compact"));
     assert!(command_tool.contains("commands --period week"));
-    assert!(!status_tool.contains("--compact"));
+    assert!(status_tool.contains("--compact"));
+    assert!(done_tool.contains("--compact"));
     assert!(!command_tool.contains("--compact"));
 }
 

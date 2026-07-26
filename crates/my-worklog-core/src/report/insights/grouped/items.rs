@@ -3,22 +3,41 @@ use std::collections::BTreeMap;
 use crate::db::repositories::StoredEvent;
 use crate::report::display::event_full_text;
 
+#[derive(Debug, Clone, Copy)]
+pub(in crate::report::insights) struct TextOptions {
+    pub(in crate::report::insights) limit: usize,
+    pub(in crate::report::insights) max_chars: usize,
+}
+
+impl TextOptions {
+    pub(in crate::report::insights) const FULL: Self = Self {
+        limit: 30,
+        max_chars: 220,
+    };
+
+    pub(in crate::report::insights) const COMPACT: Self = Self {
+        limit: 3,
+        max_chars: 96,
+    };
+}
+
 pub(super) fn text_items(
     events: &[StoredEvent],
     predicate: impl Fn(&StoredEvent) -> bool,
-    limit: usize,
+    options: TextOptions,
 ) -> Vec<String> {
     let mut groups = BTreeMap::<String, TextItem>::new();
     for event in events.iter().filter(|event| predicate(event)) {
         let Some(label) = event_full_text(event).filter(|label| !is_low_value(label)) else {
             continue;
         };
+        let label = truncate(&label, options.max_chars);
         groups
             .entry(normalize_key(&label))
             .and_modify(|item| item.count += 1)
             .or_insert_with(|| TextItem::new(label, event.source_agent_id.clone()));
     }
-    sorted(groups.into_values(), limit, |item| item.render())
+    sorted(groups.into_values(), options.limit, |item| item.render())
 }
 
 pub(super) fn count_items<'a>(
@@ -150,4 +169,14 @@ fn is_low_value(label: &str) -> bool {
         normalize_key(label).as_str(),
         "session updated" | "message updated" | "tool result" | "command finished"
     )
+}
+
+fn truncate(value: &str, max_chars: usize) -> String {
+    let mut chars = value.chars();
+    let truncated = chars.by_ref().take(max_chars).collect::<String>();
+    if chars.next().is_some() {
+        format!("{truncated}...")
+    } else {
+        truncated
+    }
 }

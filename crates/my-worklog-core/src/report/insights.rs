@@ -20,7 +20,7 @@ pub fn decisions(conn: &Connection, period: ReportPeriod) -> WorklogResult<Strin
         period,
         &events,
         is_decision,
-        30,
+        grouped::TextOptions::FULL,
     ))
 }
 
@@ -31,20 +31,29 @@ pub fn open_loops(conn: &Connection, period: ReportPeriod) -> WorklogResult<Stri
         period,
         &events,
         is_open_loop,
-        30,
+        grouped::TextOptions::FULL,
     ))
 }
 
 pub fn blockers(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> {
     let events = period_events(conn, period)?;
     Ok(grouped::text_report(
-        "Blockers", period, &events, is_blocker, 30,
+        "Blockers",
+        period,
+        &events,
+        is_blocker,
+        grouped::TextOptions::FULL,
     ))
 }
 
 pub fn done(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> {
     let events = period_events(conn, period)?;
-    Ok(grouped::done_report(period, &events, 30))
+    Ok(grouped::done_report(period, &events))
+}
+
+pub fn done_compact(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> {
+    let events = period_events(conn, period)?;
+    Ok(grouped::done_compact(period, &events))
 }
 
 pub fn files(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> {
@@ -64,7 +73,16 @@ pub fn agents(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> 
 
 pub fn status(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> {
     let events = period_events(conn, period)?;
-    Ok(grouped::status(period, &events))
+    Ok(grouped::status(period, &events, grouped::TextOptions::FULL))
+}
+
+pub fn status_compact(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> {
+    let events = period_events(conn, period)?;
+    Ok(grouped::status(
+        period,
+        &events,
+        grouped::TextOptions::COMPACT,
+    ))
 }
 
 fn period_events(conn: &Connection, period: ReportPeriod) -> WorklogResult<Vec<StoredEvent>> {
@@ -101,24 +119,27 @@ fn local_datetime(date: NaiveDate, time: chrono::NaiveTime) -> chrono::DateTime<
 }
 
 fn is_decision(event: &StoredEvent) -> bool {
-    contains_any(
-        event,
-        &["decision", "decided", "choose", "chose", "use ", "we will"],
-    )
+    !is_meta_dump(event)
+        && contains_any(
+            event,
+            &["decision", "decided", "choose", "chose", "use ", "we will"],
+        )
 }
 
 fn is_open_loop(event: &StoredEvent) -> bool {
-    contains_any(
-        event,
-        &["todo", "open loop", "follow up", "next", "remaining"],
-    )
+    !is_meta_dump(event)
+        && contains_any(
+            event,
+            &["todo", "open loop", "follow up", "next", "remaining"],
+        )
 }
 
 fn is_blocker(event: &StoredEvent) -> bool {
-    contains_any(
-        event,
-        &["blocked", "blocker", "cannot", "can't", "failed", "error"],
-    )
+    !is_meta_dump(event)
+        && contains_any(
+            event,
+            &["blocked", "blocker", "cannot", "can't", "failed", "error"],
+        )
 }
 
 fn is_done(event: &StoredEvent) -> bool {
@@ -137,6 +158,36 @@ fn is_done(event: &StoredEvent) -> bool {
             ],
         )
         && !is_open_loop(event)
+        && !is_meta_dump(event)
+}
+
+fn is_meta_dump(event: &StoredEvent) -> bool {
+    let haystack = format!(
+        "{} {}",
+        event.title.as_deref().unwrap_or_default(),
+        event.content.as_deref().unwrap_or_default()
+    )
+    .to_lowercase();
+    [
+        "implementation plan",
+        "architecture summary",
+        "## objective",
+        "## work state",
+        "## next move",
+        "relevant files",
+        "recommended shape",
+        "source-backed guidance",
+        "keep report generation pure",
+        "<analysis>",
+        "<plan>",
+        "<results>",
+        "<files>",
+        "<system-reminder>",
+        "background task completed",
+        "continue if you have next steps",
+    ]
+    .iter()
+    .any(|needle| haystack.contains(needle))
 }
 
 fn contains_any(event: &StoredEvent, needles: &[&str]) -> bool {
