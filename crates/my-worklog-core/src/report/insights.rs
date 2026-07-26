@@ -1,9 +1,10 @@
+mod grouped;
+
 use chrono::{Datelike, Days, Local, LocalResult, NaiveDate, TimeZone, Utc};
 use rusqlite::Connection;
 
 use crate::db::repositories::{StoredEvent, events_between};
 use crate::error::WorklogResult;
-use crate::report::display::{event_full_text, event_metrics};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ReportPeriod {
@@ -14,110 +15,51 @@ pub enum ReportPeriod {
 
 pub fn decisions(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> {
     let events = period_events(conn, period)?;
-    Ok(render_filtered("Decisions", period, &events, |event| {
-        contains_any(
-            event,
-            &["decision", "decided", "choose", "chose", "use ", "we will"],
-        )
-    }))
+    Ok(grouped::text_report(
+        "Decisions",
+        period,
+        &events,
+        is_decision,
+        30,
+    ))
 }
 
 pub fn open_loops(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> {
     let events = period_events(conn, period)?;
-    Ok(render_filtered("Open loops", period, &events, |event| {
-        contains_any(
-            event,
-            &["todo", "open loop", "follow up", "next", "remaining"],
-        )
-    }))
+    Ok(grouped::text_report(
+        "Open loops",
+        period,
+        &events,
+        is_open_loop,
+        30,
+    ))
 }
 
 pub fn blockers(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> {
     let events = period_events(conn, period)?;
-    Ok(render_filtered("Blockers", period, &events, |event| {
-        contains_any(
-            event,
-            &["blocked", "blocker", "cannot", "can't", "failed", "error"],
-        )
-    }))
+    Ok(grouped::text_report(
+        "Blockers", period, &events, is_blocker, 30,
+    ))
 }
 
 pub fn files(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> {
     let events = period_events(conn, period)?;
-    Ok(render_filtered("Files", period, &events, |event| {
-        event.file_path.is_some() || event.event_type.contains("file")
-    }))
+    Ok(grouped::file_report(period, &events, 30))
 }
 
 pub fn commands(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> {
     let events = period_events(conn, period)?;
-    Ok(render_filtered("Commands", period, &events, |event| {
-        event.command.is_some() || event.event_type == "command"
-    }))
+    Ok(grouped::command_report(period, &events, 30))
 }
 
 pub fn agents(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> {
     let events = period_events(conn, period)?;
-    let mut agents = events
-        .iter()
-        .map(|event| event.source_agent_id.as_str())
-        .collect::<Vec<_>>();
-    agents.sort_unstable();
-    let mut output = header("Agents", period, &events);
-    if agents.is_empty() {
-        output.push_str("No captured work events for this period.\n");
-        return Ok(output);
-    }
-    let mut current = agents[0];
-    let mut count = 0usize;
-    for agent in agents {
-        if agent != current {
-            output.push_str(&format!("- {current}: {count} events\n"));
-            current = agent;
-            count = 0;
-        }
-        count += 1;
-    }
-    output.push_str(&format!("- {current}: {count} events\n"));
-    Ok(output)
+    Ok(grouped::agent_report(period, &events, 30))
 }
 
-fn render_filtered(
-    title: &str,
-    period: ReportPeriod,
-    events: &[StoredEvent],
-    predicate: impl Fn(&StoredEvent) -> bool,
-) -> String {
-    let mut output = header(title, period, events);
-    let mut shown = 0usize;
-    for event in events.iter().filter(|event| predicate(event)).take(30) {
-        if let Some(text) = event_full_text(event) {
-            output.push_str(&format!("- {} [{}]\n", text, event.source_agent_id));
-            shown += 1;
-        }
-    }
-    if shown == 0 {
-        output.push_str(&format!(
-            "No {} found for this period.\n",
-            title.to_lowercase()
-        ));
-    }
-    output
-}
-
-fn header(title: &str, period: ReportPeriod, events: &[StoredEvent]) -> String {
-    let metrics = event_metrics(events);
-    let duration = metrics
-        .duration_label()
-        .unwrap_or_else(|| "Not available".to_string());
-    let tokens = metrics
-        .token_label()
-        .unwrap_or_else(|| "Not available".to_string());
-    format!(
-        "# {title} - {}\n\n## Metrics\n- Events: {}\n- Total time: {duration}\n- Tokens: {tokens}\n\n## Results\n",
-        period.label(),
-        events.len()
-    )
+pub fn status(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> {
+    let events = period_events(conn, period)?;
+    Ok(grouped::status(period, &events))
 }
 
 fn period_events(conn: &Connection, period: ReportPeriod) -> WorklogResult<Vec<StoredEvent>> {
@@ -153,6 +95,27 @@ fn local_datetime(date: NaiveDate, time: chrono::NaiveTime) -> chrono::DateTime<
     }
 }
 
+fn is_decision(event: &StoredEvent) -> bool {
+    contains_any(
+        event,
+        &["decision", "decided", "choose", "chose", "use ", "we will"],
+    )
+}
+
+fn is_open_loop(event: &StoredEvent) -> bool {
+    contains_any(
+        event,
+        &["todo", "open loop", "follow up", "next", "remaining"],
+    )
+}
+
+fn is_blocker(event: &StoredEvent) -> bool {
+    contains_any(
+        event,
+        &["blocked", "blocker", "cannot", "can't", "failed", "error"],
+    )
+}
+
 fn contains_any(event: &StoredEvent, needles: &[&str]) -> bool {
     let haystack = format!(
         "{} {} {}",
@@ -165,7 +128,7 @@ fn contains_any(event: &StoredEvent, needles: &[&str]) -> bool {
 }
 
 impl ReportPeriod {
-    fn label(self) -> &'static str {
+    pub(super) fn label(self) -> &'static str {
         match self {
             Self::Today => "today",
             Self::Yesterday => "yesterday",

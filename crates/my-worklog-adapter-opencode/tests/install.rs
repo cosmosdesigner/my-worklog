@@ -42,6 +42,38 @@ fn install_writes_plugin_and_tools() {
     assert!(!report.dry_run);
     assert!(dir.path().join(".opencode/plugins/my-worklog.ts").exists());
     assert!(dir.path().join(".opencode/tools/worklog_today.ts").exists());
+    assert!(
+        dir.path()
+            .join(".opencode/tools/worklog_status.ts")
+            .exists()
+    );
+    assert!(
+        dir.path()
+            .join(".opencode/tools/worklog_blockers.ts")
+            .exists()
+    );
+    assert!(dir.path().join(".opencode/tools/worklog_files.ts").exists());
+    assert!(
+        dir.path()
+            .join(".opencode/tools/worklog_commands.ts")
+            .exists()
+    );
+    assert!(
+        dir.path()
+            .join(".opencode/tools/worklog_agents.ts")
+            .exists()
+    );
+
+    let status_tool = std::fs::read_to_string(dir.path().join(".opencode/tools/worklog_status.ts"))
+        .expect("read status tool");
+    assert!(status_tool.contains("status --period today"));
+
+    let command_tool =
+        std::fs::read_to_string(dir.path().join(".opencode/tools/worklog_commands.ts"))
+            .expect("read commands tool");
+    assert!(command_tool.contains("commands --period week"));
+    assert!(!status_tool.contains("--compact"));
+    assert!(!command_tool.contains("--compact"));
 }
 
 #[test]

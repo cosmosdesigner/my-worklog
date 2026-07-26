@@ -19,6 +19,7 @@ pub mod install;
 pub mod open_loops;
 pub mod search;
 pub mod share;
+pub mod status;
 pub mod today;
 pub mod week;
 pub mod yesterday;

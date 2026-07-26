@@ -4,11 +4,16 @@ use crate::install::PlannedFile;
 
 pub fn tool_templates(target_dir: &Path) -> Vec<PlannedFile> {
     [
-        ("worklog_today.ts", "today --compact"),
-        ("worklog_yesterday.ts", "yesterday --compact"),
-        ("worklog_week.ts", "week --compact"),
-        ("worklog_decisions.ts", "decisions --compact"),
-        ("worklog_open_loops.ts", "open-loops --compact"),
+        ("worklog_today.ts", "today"),
+        ("worklog_yesterday.ts", "yesterday"),
+        ("worklog_week.ts", "week"),
+        ("worklog_status.ts", "status --period today"),
+        ("worklog_decisions.ts", "decisions --period week"),
+        ("worklog_open_loops.ts", "open-loops --period week"),
+        ("worklog_blockers.ts", "blockers --period week"),
+        ("worklog_files.ts", "files --period week"),
+        ("worklog_commands.ts", "commands --period week"),
+        ("worklog_agents.ts", "agents --period week"),
     ]
     .into_iter()
     .map(|(name, command)| PlannedFile {
@@ -52,6 +57,11 @@ mod tests {
             templates
                 .iter()
                 .any(|file| file.path.ends_with("worklog_today.ts"))
+        );
+        assert!(
+            templates
+                .iter()
+                .any(|file| file.path.ends_with("worklog_status.ts"))
         );
     }
 }
