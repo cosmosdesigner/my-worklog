@@ -13,6 +13,7 @@ my-worklog yesterday
 my-worklog week
 my-worklog search "database migration"
 my-worklog status --period today
+my-worklog done --period week
 my-worklog decisions --period yesterday
 my-worklog open-loops --period week
 my-worklog blockers --period week
@@ -68,6 +69,7 @@ tools/worklog_today.ts
 tools/worklog_yesterday.ts
 tools/worklog_week.ts
 tools/worklog_status.ts
+tools/worklog_done.ts
 tools/worklog_decisions.ts
 tools/worklog_open_loops.ts
 tools/worklog_blockers.ts
@@ -95,6 +97,7 @@ Local insight commands are deterministic and do not call an LLM:
 
 ```bash
 my-worklog status --period today
+my-worklog done --period week
 my-worklog decisions --period today
 my-worklog decisions --period yesterday
 my-worklog decisions --period week
@@ -109,8 +112,9 @@ my-worklog agents --period week
 `status` defaults to `today`; the other insight commands default to `week`.
 These commands read local SQLite data, filter/group human-readable events, and
 include available metrics such as event counts, total time, and token usage.
-`status` gives a compact dashboard with blockers, decisions, open loops, file
-activity, command activity, and source-agent counts.
+`done` answers what completed in the selected period. `status` gives a compact
+dashboard with blockers, decisions, open loops, completed work, file activity,
+command activity, and source-agent counts.
 
 Raw event data remains available explicitly for debugging or machine export:
 

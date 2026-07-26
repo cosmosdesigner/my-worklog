@@ -132,3 +132,50 @@ fn insight_reports_group_duplicates_and_status_suppresses_noise() {
     assert!(status.contains("- opencode: 9 events"));
     assert!(!status.contains("tool result"));
 }
+
+#[test]
+fn done_report_groups_completed_work_and_status_includes_it() {
+    let dir = tempdir().expect("tempdir");
+    let spool = dir.path().join("spool/opencode");
+    fs::create_dir_all(&spool).expect("create spool");
+    let yesterday = Local::now().date_naive() - Days::new(1);
+    let timestamp = |hour: u32, minute: u32| {
+        Local
+            .with_ymd_and_hms(
+                yesterday.year(),
+                yesterday.month(),
+                yesterday.day(),
+                hour,
+                minute,
+                0,
+            )
+            .single()
+            .expect("valid local fixture time")
+            .with_timezone(&chrono::Utc)
+            .to_rfc3339()
+    };
+    fs::write(
+        spool.join("events.jsonl"),
+        format!(
+            "{{\"source_agent\":\"opencode\",\"source_session_id\":\"s3\",\"source_event_id\":\"done-1\",\"type\":\"assistant_message\",\"role\":\"assistant\",\"timestamp\":\"{}\",\"content\":\"Completed: added local status dashboard\"}}\n{{\"source_agent\":\"opencode\",\"source_session_id\":\"s3\",\"source_event_id\":\"done-2\",\"type\":\"assistant_message\",\"role\":\"assistant\",\"timestamp\":\"{}\",\"content\":\"Finished: added local status dashboard\"}}\n{{\"source_agent\":\"opencode\",\"source_session_id\":\"s3\",\"source_event_id\":\"fix\",\"type\":\"assistant_message\",\"role\":\"assistant\",\"timestamp\":\"{}\",\"content\":\"Fixed OpenCode helper generation\"}}\n{{\"source_agent\":\"opencode\",\"source_session_id\":\"s3\",\"source_event_id\":\"loop\",\"type\":\"assistant_message\",\"role\":\"assistant\",\"timestamp\":\"{}\",\"content\":\"TODO: write docs next\"}}\n",
+            timestamp(10, 0),
+            timestamp(10, 1),
+            timestamp(10, 2),
+            timestamp(10, 3)
+        ),
+    )
+    .expect("write fixture");
+    let db = WorklogDb::open(&dir.path().join("worklog.sqlite")).expect("open db");
+    let redactor = Redactor::new(None).expect("redactor");
+    import_spool(db.connection(), &dir.path().join("spool"), &redactor).expect("import");
+
+    let done = insights::done(db.connection(), ReportPeriod::Yesterday).expect("render done");
+    let status = insights::status(db.connection(), ReportPeriod::Yesterday).expect("render status");
+
+    assert!(done.contains("# Done - yesterday"));
+    assert!(done.contains("Completed: added local status dashboard (2 events) [opencode]"));
+    assert!(done.contains("Fixed OpenCode helper generation [opencode]"));
+    assert!(!done.contains("TODO: write docs next"));
+    assert!(status.contains("## Completed work"));
+    assert!(status.contains("Completed: added local status dashboard (2 events) [opencode]"));
+}

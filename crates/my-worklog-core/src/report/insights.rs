@@ -42,6 +42,11 @@ pub fn blockers(conn: &Connection, period: ReportPeriod) -> WorklogResult<String
     ))
 }
 
+pub fn done(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> {
+    let events = period_events(conn, period)?;
+    Ok(grouped::done_report(period, &events, 30))
+}
+
 pub fn files(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> {
     let events = period_events(conn, period)?;
     Ok(grouped::file_report(period, &events, 30))
@@ -114,6 +119,24 @@ fn is_blocker(event: &StoredEvent) -> bool {
         event,
         &["blocked", "blocker", "cannot", "can't", "failed", "error"],
     )
+}
+
+fn is_done(event: &StoredEvent) -> bool {
+    event.event_type == "assistant_message"
+        && contains_any(
+            event,
+            &[
+                "completed",
+                "finished",
+                "done",
+                "implemented",
+                "added",
+                "fixed",
+                "resolved",
+                "shipped",
+            ],
+        )
+        && !is_open_loop(event)
 }
 
 fn contains_any(event: &StoredEvent, needles: &[&str]) -> bool {

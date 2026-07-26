@@ -8,6 +8,7 @@ pub fn tool_templates(target_dir: &Path) -> Vec<PlannedFile> {
         ("worklog_yesterday.ts", "yesterday"),
         ("worklog_week.ts", "week"),
         ("worklog_status.ts", "status --period today"),
+        ("worklog_done.ts", "done --period week"),
         ("worklog_decisions.ts", "decisions --period week"),
         ("worklog_open_loops.ts", "open-loops --period week"),
         ("worklog_blockers.ts", "blockers --period week"),

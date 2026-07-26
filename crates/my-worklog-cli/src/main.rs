@@ -56,6 +56,8 @@ enum Command {
     Share(commands::share::ShareArgs),
     #[command(about = "Show a compact local status dashboard")]
     Status(commands::status::Args),
+    #[command(about = "Show completed work found in local work events")]
+    Done(commands::done::Args),
     #[command(about = "Show decisions found in local work events")]
     Decisions(commands::decisions::Args),
     #[command(
@@ -90,6 +92,7 @@ fn main() -> Result<()> {
         Command::Search(args) => commands::search::run(&context, &args),
         Command::Share(args) => commands::share::run(&context, &args),
         Command::Status(args) => commands::status::run(&context, &args),
+        Command::Done(args) => commands::done::run(&context, &args),
         Command::Decisions(args) => commands::decisions::run(&context, &args),
         Command::OpenLoops(args) => commands::open_loops::run(&context, &args),
         Command::Blockers(args) => commands::blockers::run(&context, &args),

@@ -1,8 +1,12 @@
-use std::collections::{BTreeMap, BTreeSet};
+mod items;
+
+use std::collections::BTreeSet;
 
 use crate::db::repositories::StoredEvent;
-use crate::report::display::{event_full_text, event_metrics};
+use crate::report::display::event_metrics;
 use crate::report::insights::ReportPeriod;
+
+use self::items::{count_items, text_items};
 
 pub(super) fn text_report(
     title: &str,
@@ -24,6 +28,10 @@ pub(super) fn command_report(period: ReportPeriod, events: &[StoredEvent], limit
 
 pub(super) fn agent_report(period: ReportPeriod, events: &[StoredEvent], limit: usize) -> String {
     report("Agents", period, events, agent_items(events, limit))
+}
+
+pub(super) fn done_report(period: ReportPeriod, events: &[StoredEvent], limit: usize) -> String {
+    report("Done", period, events, done_items(events, limit))
 }
 
 pub(super) fn status(period: ReportPeriod, events: &[StoredEvent]) -> String {
@@ -59,6 +67,7 @@ pub(super) fn status(period: ReportPeriod, events: &[StoredEvent]) -> String {
         "Open loops",
         text_items(events, super::is_open_loop, 5),
     );
+    section(&mut output, "Completed work", done_items(events, 5));
     section(&mut output, "Files", file_items(events, 5));
     section(&mut output, "Commands", command_items(events, 5));
     section(&mut output, "Agents", agent_items(events, 5));
@@ -104,22 +113,8 @@ fn results(output: &mut String, title: &str, items: Vec<String>) {
     }
 }
 
-fn text_items(
-    events: &[StoredEvent],
-    predicate: impl Fn(&StoredEvent) -> bool,
-    limit: usize,
-) -> Vec<String> {
-    let mut groups = BTreeMap::<String, TextItem>::new();
-    for event in events.iter().filter(|event| predicate(event)) {
-        let Some(label) = event_full_text(event).filter(|label| !is_low_value(label)) else {
-            continue;
-        };
-        groups
-            .entry(normalize_key(&label))
-            .and_modify(|item| item.count += 1)
-            .or_insert_with(|| TextItem::new(label, event.source_agent_id.clone()));
-    }
-    sorted(groups.into_values(), limit, |item| item.render())
+fn done_items(events: &[StoredEvent], limit: usize) -> Vec<String> {
+    text_items(events, super::is_done, limit)
 }
 
 fn file_items(events: &[StoredEvent], limit: usize) -> Vec<String> {
@@ -143,129 +138,5 @@ fn agent_items(events: &[StoredEvent], limit: usize) -> Vec<String> {
         events.iter().map(|event| event.source_agent_id.as_str()),
         limit,
         "events",
-    )
-}
-
-fn count_items<'a>(labels: impl Iterator<Item = &'a str>, limit: usize, unit: &str) -> Vec<String> {
-    let mut counts = BTreeMap::<String, CountItem>::new();
-    for label in labels {
-        let label = label.trim();
-        counts
-            .entry(label.to_string())
-            .and_modify(|item| item.count += 1)
-            .or_insert_with(|| CountItem::new(label));
-    }
-    sorted(counts.into_values(), limit, |item| item.render(unit))
-}
-
-fn sorted<T: ItemCount>(
-    items: impl Iterator<Item = T>,
-    limit: usize,
-    render: impl Fn(&T) -> String,
-) -> Vec<String> {
-    let mut items = items.collect::<Vec<_>>();
-    items.sort_by(|left, right| {
-        right
-            .count()
-            .cmp(&left.count())
-            .then_with(|| render(left).cmp(&render(right)))
-    });
-    items
-        .into_iter()
-        .take(limit)
-        .map(|item| render(&item))
-        .collect()
-}
-
-trait ItemCount {
-    fn count(&self) -> usize;
-}
-
-struct TextItem {
-    label: String,
-    source_agent_id: String,
-    count: usize,
-}
-
-impl TextItem {
-    fn new(label: String, source_agent_id: String) -> Self {
-        Self {
-            label,
-            source_agent_id,
-            count: 1,
-        }
-    }
-
-    fn render(&self) -> String {
-        if self.count == 1 {
-            format!("{} [{}]", self.label, self.source_agent_id)
-        } else {
-            format!(
-                "{} ({} events) [{}]",
-                self.label, self.count, self.source_agent_id
-            )
-        }
-    }
-}
-
-impl ItemCount for TextItem {
-    fn count(&self) -> usize {
-        self.count
-    }
-}
-
-struct CountItem {
-    label: String,
-    count: usize,
-}
-
-impl CountItem {
-    fn new(label: &str) -> Self {
-        Self {
-            label: label.to_string(),
-            count: 1,
-        }
-    }
-
-    fn render(&self, unit: &str) -> String {
-        format!("{}: {} {unit}", self.label, self.count)
-    }
-}
-
-impl ItemCount for CountItem {
-    fn count(&self) -> usize {
-        self.count
-    }
-}
-
-fn normalize_key(label: &str) -> String {
-    let mut value = label.split_whitespace().collect::<Vec<_>>().join(" ");
-    for prefix in [
-        "Assistant:",
-        "User:",
-        "Todo:",
-        "Decision:",
-        "Decided:",
-        "TODO:",
-        "Next:",
-        "Blocked:",
-        "Blocker:",
-    ] {
-        value = strip_prefix_ci(&value, prefix).to_string();
-    }
-    value.to_lowercase()
-}
-
-fn strip_prefix_ci<'a>(value: &'a str, prefix: &str) -> &'a str {
-    value
-        .get(..prefix.len())
-        .filter(|head| head.eq_ignore_ascii_case(prefix))
-        .map_or(value, |_| value[prefix.len()..].trim_start())
-}
-
-fn is_low_value(label: &str) -> bool {
-    matches!(
-        normalize_key(label).as_str(),
-        "session updated" | "message updated" | "tool result" | "command finished"
     )
 }

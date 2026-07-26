@@ -11,6 +11,7 @@ pub mod cleanup;
 pub mod command_activity;
 pub mod decisions;
 pub mod doctor;
+pub mod done;
 pub mod export;
 pub mod files;
 pub mod import;
