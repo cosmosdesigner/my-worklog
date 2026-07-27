@@ -5,6 +5,7 @@ use std::collections::BTreeSet;
 use crate::db::repositories::StoredEvent;
 use crate::report::display::event_metrics;
 use crate::report::insights::ReportPeriod;
+use crate::report::project;
 
 pub(super) use self::items::TextOptions;
 use self::items::{count_items, text_items};
@@ -16,42 +17,37 @@ pub(super) fn text_report(
     predicate: impl Fn(&StoredEvent) -> bool,
     options: TextOptions,
 ) -> String {
-    report(
-        title,
-        period,
-        events,
-        text_items(events, predicate, options),
-    )
+    report_with(title, period, events, |events| {
+        text_items(events, &predicate, options)
+    })
 }
 
 pub(super) fn file_report(period: ReportPeriod, events: &[StoredEvent], limit: usize) -> String {
-    report("Files", period, events, file_items(events, limit))
+    report_with("Files", period, events, |events| file_items(events, limit))
 }
 
 pub(super) fn command_report(period: ReportPeriod, events: &[StoredEvent], limit: usize) -> String {
-    report("Commands", period, events, command_items(events, limit))
+    report_with("Commands", period, events, |events| {
+        command_items(events, limit)
+    })
 }
 
 pub(super) fn agent_report(period: ReportPeriod, events: &[StoredEvent], limit: usize) -> String {
-    report("Agents", period, events, agent_items(events, limit))
+    report_with("Agents", period, events, |events| {
+        agent_items(events, limit)
+    })
 }
 
 pub(super) fn done_report(period: ReportPeriod, events: &[StoredEvent]) -> String {
-    report(
-        "Done",
-        period,
-        events,
-        done_items(events, TextOptions::FULL),
-    )
+    report_with("Done", period, events, |events| {
+        done_items(events, TextOptions::FULL)
+    })
 }
 
 pub(super) fn done_compact(period: ReportPeriod, events: &[StoredEvent]) -> String {
-    report(
-        "Done",
-        period,
-        events,
-        done_items(events, TextOptions::COMPACT),
-    )
+    report_with("Done", period, events, |events| {
+        done_items(events, TextOptions::COMPACT)
+    })
 }
 
 pub(super) fn status(period: ReportPeriod, events: &[StoredEvent], options: TextOptions) -> String {
@@ -101,31 +97,44 @@ fn status_with(
         period.label(),
         events.len()
     );
-    section(
-        &mut output,
-        "Blockers",
-        text_items(events, is_blocker, options),
-    );
-    section(
-        &mut output,
-        "Decisions",
-        text_items(events, is_decision, options),
-    );
-    section(
-        &mut output,
-        "Open loops",
-        text_items(events, is_open_loop, options),
-    );
-    section(&mut output, "Completed work", done_items(events, options));
-    section(&mut output, "Files", file_items(events, 5));
-    section(&mut output, "Commands", command_items(events, 5));
-    section(&mut output, "Agents", agent_items(events, 5));
+    if project::has_multiple_projects(events) {
+        projects(&mut output, events);
+    }
+    section_with(&mut output, "Blockers", events, |events| {
+        text_items(events, is_blocker, options)
+    });
+    section_with(&mut output, "Decisions", events, |events| {
+        text_items(events, is_decision, options)
+    });
+    section_with(&mut output, "Open loops", events, |events| {
+        text_items(events, is_open_loop, options)
+    });
+    section_with(&mut output, "Completed work", events, |events| {
+        done_items(events, options)
+    });
+    section_with(&mut output, "Files", events, |events| file_items(events, 5));
+    section_with(&mut output, "Commands", events, |events| {
+        command_items(events, 5)
+    });
+    section_with(&mut output, "Agents", events, |events| {
+        agent_items(events, 5)
+    });
     output
 }
 
-fn report(title: &str, period: ReportPeriod, events: &[StoredEvent], items: Vec<String>) -> String {
+fn report_with(
+    title: &str,
+    period: ReportPeriod,
+    events: &[StoredEvent],
+    items: impl Fn(&[StoredEvent]) -> Vec<String>,
+) -> String {
     let mut output = header(title, period, events);
-    results(&mut output, title, items);
+    if project::has_multiple_projects(events) {
+        projects(&mut output, events);
+        grouped_results(&mut output, title, events, items);
+    } else {
+        results(&mut output, title, items(events));
+    }
     output
 }
 
@@ -144,9 +153,52 @@ fn header(title: &str, period: ReportPeriod, events: &[StoredEvent]) -> String {
     )
 }
 
-fn section(output: &mut String, title: &str, items: Vec<String>) {
+fn section_with(
+    output: &mut String,
+    title: &str,
+    events: &[StoredEvent],
+    items: impl Fn(&[StoredEvent]) -> Vec<String>,
+) {
     output.push_str(&format!("\n## {title}\n"));
-    results(output, title, items);
+    if project::has_multiple_projects(events) {
+        grouped_results(output, title, events, items);
+    } else {
+        results(output, title, items(events));
+    }
+}
+
+fn projects(output: &mut String, events: &[StoredEvent]) {
+    output.push_str("\n## Projects\n");
+    for line in project::count_lines(events) {
+        output.push_str(&format!("- {line}\n"));
+    }
+}
+
+fn grouped_results(
+    output: &mut String,
+    title: &str,
+    events: &[StoredEvent],
+    items: impl Fn(&[StoredEvent]) -> Vec<String>,
+) {
+    let mut wrote = false;
+    for group in project::groups(events) {
+        let project_events = group.events.into_iter().cloned().collect::<Vec<_>>();
+        let project_items = items(&project_events);
+        if project_items.is_empty() {
+            continue;
+        }
+        output.push_str(&format!("\n### {}\n", group.label));
+        for item in project_items {
+            output.push_str(&format!("- {item}\n"));
+        }
+        wrote = true;
+    }
+    if !wrote {
+        output.push_str(&format!(
+            "No {} found for this period.\n",
+            title.to_lowercase()
+        ));
+    }
 }
 
 fn results(output: &mut String, title: &str, items: Vec<String>) {

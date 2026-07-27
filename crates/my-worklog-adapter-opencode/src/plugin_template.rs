@@ -35,6 +35,8 @@ function write(type: string, payload: unknown) {{
       source_agent: "opencode",
       type,
       timestamp: new Date().toISOString(),
+      cwd: process.cwd(),
+      project_root: process.cwd(),
       content: JSON.stringify(redact(payload)),
     }}) + "\n");
   }} catch {{
@@ -78,6 +80,8 @@ mod tests {
         assert!(!rendered.contains("@opencode-ai/plugin/v2/promise"));
         assert!(rendered.contains("session.updated"));
         assert!(!rendered.contains("plugin.added"));
+        assert!(rendered.contains("cwd: process.cwd()"));
+        assert!(rendered.contains("project_root: process.cwd()"));
         assert!(rendered.contains("/tmp/worklog/spool/opencode/events.jsonl"));
     }
 }

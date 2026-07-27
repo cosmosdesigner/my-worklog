@@ -156,6 +156,8 @@ my-worklog agents --period week
 
 These commands filter and group human-readable events, then include available metrics such as event counts, total time, and token usage. `done` answers what completed in the selected period. `status` gives a dashboard with blockers, decisions, open loops, completed work, file activity, command activity, and source-agent counts. Add `--compact` to `status` or `done` for shorter top-item lists and truncated bullets suitable for OpenCode answers.
 
+When a period contains work from multiple captured project roots, local period and insight reports add a `Projects` summary and group the worked events under project subsections. Project labels come from captured project metadata or the basename of the captured root/cwd; MyWorklog does not scan parent folders or list sibling repositories that had no captured events.
+
 ## CLI Reference
 
 Common commands:

@@ -1,5 +1,6 @@
 use crate::db::repositories::StoredEvent;
 use crate::report::display::{event_full_text, event_kind_counts, event_label, event_metrics};
+use crate::report::project;
 
 pub fn render_report(title: &str, events: &[StoredEvent]) -> String {
     render_report_with_limit(title, events, Some(20))
@@ -37,11 +38,27 @@ pub fn render_share_context(title: &str, events: &[StoredEvent]) -> String {
 
 fn render_report_with_limit(title: &str, events: &[StoredEvent], limit: Option<usize>) -> String {
     let mut output = render_summary(title, events);
+    if project::has_multiple_projects(events) {
+        output.push_str("## Projects\n");
+        for line in project::count_lines(events) {
+            output.push_str(&format!("- {line}\n"));
+        }
+        output.push('\n');
+    }
     output.push_str("## Main work\n");
     if events.is_empty() {
         output.push_str("No captured work events for this period.\n");
         return output;
     }
+    if project::has_multiple_projects(events) {
+        render_grouped_work(&mut output, events, limit);
+    } else {
+        render_flat_work(&mut output, events, limit);
+    }
+    output
+}
+
+fn render_flat_work(output: &mut String, events: &[StoredEvent], limit: Option<usize>) {
     let mut shown = 0usize;
     for event in events {
         let Some(label) = event_label(event) else {
@@ -56,7 +73,35 @@ fn render_report_with_limit(title: &str, events: &[StoredEvent], limit: Option<u
     if shown == 0 {
         output.push_str("No human-readable work events for this period. Use an explicit raw/export command to inspect stored provider events.\n");
     }
-    output
+}
+
+fn render_grouped_work(output: &mut String, events: &[StoredEvent], limit: Option<usize>) {
+    let mut shown = 0usize;
+    for group in project::groups(events) {
+        let mut lines = Vec::new();
+        for event in group.events {
+            let Some(label) = event_label(event) else {
+                continue;
+            };
+            lines.push(format!("- {} [{}]\n", label, event.source_agent_id));
+            shown += 1;
+            if limit.is_some_and(|limit| shown == limit) {
+                break;
+            }
+        }
+        if !lines.is_empty() {
+            output.push_str(&format!("\n### {}\n", group.label));
+            for line in lines {
+                output.push_str(&line);
+            }
+        }
+        if limit.is_some_and(|limit| shown == limit) {
+            break;
+        }
+    }
+    if shown == 0 {
+        output.push_str("No human-readable work events for this period. Use an explicit raw/export command to inspect stored provider events.\n");
+    }
 }
 
 fn render_summary(title: &str, events: &[StoredEvent]) -> String {

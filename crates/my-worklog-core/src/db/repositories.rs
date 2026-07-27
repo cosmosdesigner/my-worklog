@@ -2,6 +2,9 @@ use chrono::{DateTime, Utc};
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::db::cleanup::install_noise_function;
+use crate::db::event_rows::{
+    EVENT_BY_ID_SQL, EVENTS_BETWEEN_SQL, SEARCH_LIKE_SQL, collect_events, row_to_event,
+};
 use crate::error::WorklogResult;
 use crate::ingest::normalize::{NormalizedSpoolEvent, stable_id};
 
@@ -13,6 +16,8 @@ pub struct EventRow {
     pub content: Option<String>,
     pub timestamp: Option<String>,
     pub cwd: Option<String>,
+    pub project_root: Option<String>,
+    pub project_name: Option<String>,
     pub command: Option<String>,
     pub file_path: Option<String>,
     pub duration_ms: Option<i64>,
@@ -37,6 +42,8 @@ pub struct StoredEvent {
     pub content: Option<String>,
     pub timestamp: Option<String>,
     pub cwd: Option<String>,
+    pub project_root: Option<String>,
+    pub project_name: Option<String>,
     pub command: Option<String>,
     pub file_path: Option<String>,
     pub duration_ms: Option<i64>,
@@ -67,6 +74,21 @@ pub fn insert_event(conn: &Connection, event: &NormalizedSpoolEvent) -> WorklogR
             optional_time(event.timestamp),
             event.cwd,
             event.raw_ref,
+            now,
+        ],
+    )?;
+    conn.execute(
+        "UPDATE work_session
+         SET project_id = COALESCE(project_id, ?2),
+             cwd = COALESCE(cwd, ?3),
+             last_seen_at = COALESCE(?4, last_seen_at),
+             updated_at = ?5
+         WHERE id = ?1",
+        params![
+            event.session_id,
+            project_id,
+            event.cwd,
+            optional_time(event.timestamp),
             now,
         ],
     )?;
@@ -117,13 +139,7 @@ pub fn events_between(
     end: DateTime<Utc>,
 ) -> WorklogResult<Vec<StoredEvent>> {
     install_noise_function(conn)?;
-    let mut stmt = conn.prepare(
-        "SELECT id, source_agent_id, session_id, type, title, content, timestamp, cwd, command, file_path, duration_ms, raw_json
-         FROM work_event
-         WHERE timestamp >= ?1 AND timestamp < ?2
-           AND NOT (source_agent_id = 'opencode' AND type = 'event' AND is_opencode_noise(normalized_content))
-         ORDER BY timestamp ASC, id ASC",
-    )?;
+    let mut stmt = conn.prepare(EVENTS_BETWEEN_SQL)?;
     collect_events(stmt.query_map(params![start.to_rfc3339(), end.to_rfc3339()], row_to_event)?)
 }
 
@@ -138,14 +154,7 @@ pub fn search_events(conn: &Connection, query: &str) -> WorklogResult<Vec<Stored
 fn search_like(conn: &Connection, query: &str) -> WorklogResult<Vec<StoredEvent>> {
     install_noise_function(conn)?;
     let needle = format!("%{}%", query.to_lowercase());
-    let mut stmt = conn.prepare(
-        "SELECT id, source_agent_id, session_id, type, title, content, timestamp, cwd, command, file_path, duration_ms, raw_json
-         FROM work_event
-         WHERE lower(coalesce(title, '') || ' ' || coalesce(normalized_content, '') || ' ' || coalesce(command, '')) LIKE ?1
-           AND NOT (source_agent_id = 'opencode' AND type = 'event' AND is_opencode_noise(normalized_content))
-         ORDER BY timestamp DESC, id ASC
-         LIMIT 50",
-    )?;
+    let mut stmt = conn.prepare(SEARCH_LIKE_SQL)?;
     collect_events(stmt.query_map(params![needle], row_to_event)?)
 }
 
@@ -170,14 +179,9 @@ fn search_fts(conn: &Connection, query: &str) -> WorklogResult<Vec<StoredEvent>>
 }
 
 fn event_by_id(conn: &Connection, id: &str) -> WorklogResult<Option<StoredEvent>> {
-    conn.query_row(
-        "SELECT id, source_agent_id, session_id, type, title, content, timestamp, cwd, command, file_path, duration_ms, raw_json
-         FROM work_event WHERE id = ?1",
-        params![id],
-        row_to_event,
-    )
-    .optional()
-    .map_err(Into::into)
+    conn.query_row(EVENT_BY_ID_SQL, params![id], row_to_event)
+        .optional()
+        .map_err(Into::into)
 }
 
 fn has_fts(conn: &Connection) -> WorklogResult<bool> {
@@ -219,27 +223,4 @@ fn project_name(root: &str) -> Option<String> {
         .file_name()
         .and_then(|name| name.to_str())
         .map(ToOwned::to_owned)
-}
-
-fn collect_events(
-    rows: impl Iterator<Item = rusqlite::Result<StoredEvent>>,
-) -> WorklogResult<Vec<StoredEvent>> {
-    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
-}
-
-fn row_to_event(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredEvent> {
-    Ok(StoredEvent {
-        id: row.get(0)?,
-        source_agent_id: row.get(1)?,
-        session_id: row.get(2)?,
-        event_type: row.get(3)?,
-        title: row.get(4)?,
-        content: row.get(5)?,
-        timestamp: row.get(6)?,
-        cwd: row.get(7)?,
-        command: row.get(8)?,
-        file_path: row.get(9)?,
-        duration_ms: row.get(10)?,
-        raw_json: row.get(11)?,
-    })
 }
