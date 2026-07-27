@@ -66,7 +66,7 @@ my-worklog export events --jsonl
 
 LLM wording is opt-in through `share`. `share` sends the already human-readable report text, not raw provider payloads, to the selected provider. Use it when you want a polished manager update, client note, or external summary.
 
-## Quick Install
+## Quickstart
 
 Clone the repository and install the CLI binary with Cargo:
 
@@ -100,13 +100,23 @@ If an older installation already exists, overwrite it with timestamped backups:
 my-worklog install opencode --global --force
 ```
 
-Restart OpenCode after installation. Then initialize and import local OpenCode history when needed:
+Restart OpenCode after installation so the plugin and helper tools load. Then initialize MyWorklog, import local OpenCode history, and try a compact weekly status:
 
 ```bash
 my-worklog init
 my-worklog import --opencode
-my-worklog yesterday
+my-worklog status --period week --compact
 ```
+
+Normal onboarding is local. The plugin records redacted events on disk, `my-worklog init` creates local state, and `my-worklog import --opencode` reads local OpenCode history. None of those steps call an LLM.
+
+## Troubleshooting OpenCode Setup
+
+- Install refuses to overwrite a file: rerun with `my-worklog install opencode --global --force` to create timestamped backups before replacing existing plugin or tool files. Use `my-worklog install opencode --global --dry-run` first if you want to preview the paths.
+- OpenCode uses a different global config path: set `OPENCODE_CONFIG_DIR=/path/to/opencode` before running `my-worklog install opencode --global`, or pass `my-worklog install opencode --target-dir /path/to/opencode` for one install. `my-worklog doctor` prints the config directory it checks.
+- OpenCode history is missing: run `my-worklog doctor`. If it reports a missing import source, pass the exact source with `my-worklog import --opencode --opencode-db <path>` or `my-worklog import --opencode --opencode-export <path>`.
+- Import says zero OpenCode messages were imported: duplicates may already be in SQLite, or the session may contain only skipped noise. Open OpenCode, start a real session, then run `my-worklog import --opencode` again and check `my-worklog status --period week --compact`.
+- LLM privacy boundary: normal onboarding and report commands don't call an LLM. Only `my-worklog share <period>` sends the generated report text to the selected provider, and `my-worklog share <period> --print-prompt` shows that text before sending.
 
 ## Daily Use
 

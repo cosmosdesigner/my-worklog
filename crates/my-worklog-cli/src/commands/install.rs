@@ -4,7 +4,9 @@ use std::path::PathBuf;
 use anyhow::{Result, bail};
 use clap::{Args, ValueEnum};
 use directories::BaseDirs;
-use my_worklog_adapter_opencode::install::{InstallOptions, InstallPlan, default_project_target};
+use my_worklog_adapter_opencode::install::{
+    InstallOptions, InstallPlan, OpenCodeInstallError, default_project_target,
+};
 
 use crate::commands::Context;
 
@@ -52,29 +54,60 @@ fn install_opencode(context: &Context, args: &InstallArgs) -> Result<()> {
         include_tools: !args.without_tools,
     };
     let plan = InstallPlan::build(&options);
-    let report = plan.apply(&options)?;
+    let report = match plan.apply(&options) {
+        Ok(report) => report,
+        Err(OpenCodeInstallError::ExistingFile(path)) => bail!(
+            "refusing to overwrite existing file without --force: {}\nUse --force to create timestamped backups before overwriting OpenCode integration files.",
+            path.display()
+        ),
+        Err(error) => return Err(error.into()),
+    };
     if report.dry_run {
         println!("OpenCode install dry-run. Files that would be written:");
         for file in &plan.files {
             println!("- {}", file.path.display());
         }
+        print_install_details(&options);
         println!(
             "\nAdd this plugin in your OpenCode config if your local plugin directory is not auto-loaded:"
         );
         println!("plugin: [\"./plugins/my-worklog.ts\"]");
+        print_next_steps();
         return Ok(());
     }
     println!("Installed OpenCode integration:");
     for file in report.files {
         println!("- {}", file.display());
     }
+    print_install_details(&options);
     if !report.backups.is_empty() {
-        println!("\nBackups:");
+        println!("\nBackup created:");
         for backup in report.backups {
             println!("- {}", backup.display());
         }
     }
+    print_next_steps();
     Ok(())
+}
+
+fn print_install_details(options: &InstallOptions) {
+    println!(
+        "\nOpenCode config directory: {}",
+        options.target_dir.display()
+    );
+    if options.include_tools {
+        println!("Helper tools: included");
+    } else {
+        println!("Helper tools: skipped (--without-tools)");
+    }
+}
+
+fn print_next_steps() {
+    println!("\nNext steps:");
+    println!("1. my-worklog init");
+    println!("2. Restart OpenCode");
+    println!("3. my-worklog import --opencode");
+    println!("4. my-worklog status --period week --compact");
 }
 
 fn resolve_target_dir(args: &InstallArgs) -> Result<PathBuf> {

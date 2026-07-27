@@ -71,7 +71,9 @@ fn import_opencode(
         None => default_db_path().unwrap_or_default(),
     };
     if db_path.as_os_str().is_empty() || !db_path.exists() {
-        bail!("No OpenCode local state found. Pass --opencode-db or --opencode-export.");
+        bail!(
+            "No OpenCode import source found. Pass --opencode-db <path> for a local OpenCode SQLite DB or --opencode-export <path> for an OpenCode export JSON file/directory."
+        );
     }
     Ok(import_opencode_db(conn, &db_path, redactor)?)
 }
@@ -81,4 +83,18 @@ fn print_outcome(label: &str, outcome: &ImportOutcome) {
         "Imported {} {} ({} duplicates, {} malformed, {} skipped noise).",
         outcome.imported, label, outcome.duplicates, outcome.malformed, outcome.skipped_noise
     );
+    if label == "OpenCode messages" {
+        print_opencode_guidance(outcome);
+    }
+}
+
+fn print_opencode_guidance(outcome: &ImportOutcome) {
+    if outcome.imported == 0 {
+        println!(
+            "No new OpenCode messages found. Duplicates were already imported; skipped noise was ignored. Open OpenCode and start a session, or pass --opencode-db/--opencode-export if your history lives elsewhere."
+        );
+        println!("Try: my-worklog status --period week --compact");
+    } else {
+        println!("Next: my-worklog status --period week --compact");
+    }
 }
