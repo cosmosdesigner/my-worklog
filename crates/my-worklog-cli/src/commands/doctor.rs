@@ -43,9 +43,9 @@ pub fn run(context: &Context) -> Result<()> {
         context.paths.spool().display()
     );
     println!("\nAgents:");
-    println!("✓ OpenCode adapter available for spool import");
-    println!("✓ Codex adapter available for spool import");
-    println!("✓ Claude adapter available for spool import");
+    println!("✓ OpenCode productized installer and import path");
+    println!("✓ Spool contract source IDs: opencode, codex, claude");
+    println!("! Codex and Claude are adapter contract sources, not installed integrations");
     print_opencode_readiness(context, db_exists);
     Ok(())
 }

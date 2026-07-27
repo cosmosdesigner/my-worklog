@@ -25,6 +25,12 @@ Coding-agent work moves fast. Important context often lives across prompts, tool
 - Give OpenCode compact answers that are short enough to paste into a chat.
 - Turn a local report into a manager or client update only when you ask for it.
 
+## Supported Integrations
+
+- OpenCode: productized installer, plugin, helper tools, and import path are available today.
+- Codex and Claude: supported source IDs for the local spool contract, but not install-ready integrations. There is no `install codex` or `install claude` target.
+- Generic spool contract: any harness can write normalized JSONL to `~/.my-worklog/spool/<agent>/events.jsonl` and use `my-worklog import --spool`. See `docs/adapter-contract.md`.
+
 ## What the OpenCode Plugin Does
 
 The OpenCode integration installs a plugin plus helper tools into OpenCode's global config directory. During OpenCode sessions, the plugin writes local redacted events to:

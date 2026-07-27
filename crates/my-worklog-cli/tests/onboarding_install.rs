@@ -35,6 +35,23 @@ fn install_dry_run_describes_files_tools_and_next_steps() {
 }
 
 #[test]
+fn install_all_dry_run_means_all_currently_implemented_install_targets() {
+    // Given: only the OpenCode installer is productized today.
+    let env = TestEnv::new();
+    let target_dir = env.opencode.to_str().expect("utf-8 path");
+
+    // When: the aggregate install target is previewed.
+    let output = env.run(["install", "all", "--target-dir", target_dir, "--dry-run"]);
+
+    // Then: all means implemented install targets, not universal harness support.
+    assert_success(&output);
+    assert_stdout_contains(&output, "OpenCode install dry-run");
+    assert_stdout_contains(&output, "plugins/my-worklog.ts");
+    assert!(!output.stdout.contains("Codex"));
+    assert!(!output.stdout.contains("Claude"));
+}
+
+#[test]
 fn install_success_describes_written_files_and_next_steps() {
     // Given: an empty target OpenCode config directory in a sandbox.
     let env = TestEnv::new();

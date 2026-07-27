@@ -34,6 +34,15 @@ fn doctor_reports_healthy_opencode_readiness() {
 
     // Then: doctor has an OpenCode readiness section with all green checks.
     assert_success(&output);
+    assert_stdout_contains(&output, "OpenCode productized installer and import path");
+    assert_stdout_contains(
+        &output,
+        "Spool contract source IDs: opencode, codex, claude",
+    );
+    assert_stdout_contains(
+        &output,
+        "Codex and Claude are adapter contract sources, not installed integrations",
+    );
     assert_stdout_contains(&output, "OpenCode:");
     assert_stdout_contains(&output, "Plugin: ready");
     assert_stdout_contains(&output, "Helper tools: ready");
