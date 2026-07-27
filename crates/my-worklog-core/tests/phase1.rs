@@ -211,42 +211,6 @@ fn active_day_report_stops_at_call_time() {
 }
 
 #[test]
-fn active_yesterday_reports_stop_at_previous_day_call_time() {
-    let dir = tempdir().expect("tempdir");
-    let spool = dir.path().join("spool/opencode");
-    fs::create_dir_all(&spool).expect("create spool");
-    fs::write(
-        spool.join("events.jsonl"),
-        r#"{"source_agent":"opencode","source_session_id":"s1","source_event_id":"past","type":"user_prompt","role":"user","timestamp":"2026-07-24T09:00:00Z","content":"Yesterday included item"}
-{"source_agent":"opencode","source_session_id":"s1","source_event_id":"late","type":"user_prompt","role":"user","timestamp":"2026-07-24T10:30:00Z","content":"Yesterday later item"}
-{"source_agent":"opencode","source_session_id":"s1","source_event_id":"today","type":"user_prompt","role":"user","timestamp":"2026-07-25T09:00:00Z","content":"Today item"}
-"#,
-    )
-    .expect("write fixture");
-    let db = WorklogDb::open(&dir.path().join("worklog.sqlite")).expect("open db");
-    let redactor = Redactor::new(None).expect("redactor");
-    import_spool(db.connection(), &dir.path().join("spool"), &redactor).expect("import");
-    let now = chrono::Utc
-        .with_ymd_and_hms(2026, 7, 25, 10, 0, 0)
-        .single()
-        .expect("valid now")
-        .with_timezone(&chrono::Local);
-
-    let terminal_report =
-        daily::render_yesterday_until(db.connection(), now).expect("render active yesterday");
-    let full_report =
-        daily::render_full_yesterday_until(db.connection(), now).expect("render full yesterday");
-    let share_context =
-        daily::render_share_yesterday_until(db.connection(), now).expect("render share yesterday");
-
-    for report in [terminal_report, full_report, share_context] {
-        assert!(report.contains("Yesterday included item"));
-        assert!(!report.contains("Yesterday later item"));
-        assert!(!report.contains("Today item"));
-    }
-}
-
-#[test]
 fn active_week_report_stops_at_call_time() {
     let dir = tempdir().expect("tempdir");
     let spool = dir.path().join("spool/opencode");

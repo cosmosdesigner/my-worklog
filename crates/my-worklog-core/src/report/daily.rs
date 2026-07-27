@@ -117,11 +117,17 @@ fn day_window(date: NaiveDate) -> (DateTime<Utc>, DateTime<Utc>) {
 
 fn yesterday_window_end(now: DateTime<Local>) -> (NaiveDate, DateTime<Local>) {
     let date = now.date_naive() - Days::new(1);
-    let local_end = date.and_time(now.time());
-    let end = match Local.from_local_datetime(&local_end) {
+    (date, day_start(now.date_naive()))
+}
+
+fn day_start(date: NaiveDate) -> DateTime<Local> {
+    let midnight = match date.and_hms_opt(0, 0, 0) {
+        Some(value) => value,
+        None => unreachable!("midnight is valid for every NaiveDate"),
+    };
+    match Local.from_local_datetime(&midnight) {
         LocalResult::Single(value) => value,
         LocalResult::Ambiguous(earliest, _) => earliest,
-        LocalResult::None => Utc.from_utc_datetime(&local_end).with_timezone(&Local),
-    };
-    (date, end)
+        LocalResult::None => Utc.from_utc_datetime(&midnight).with_timezone(&Local),
+    }
 }

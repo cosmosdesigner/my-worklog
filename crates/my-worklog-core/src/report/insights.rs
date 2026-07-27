@@ -87,7 +87,7 @@ fn period_events(conn: &Connection, period: ReportPeriod) -> WorklogResult<Vec<S
         ReportPeriod::Today => (day_start(now.date_naive()), now),
         ReportPeriod::Yesterday => {
             let date = now.date_naive() - Days::new(1);
-            (day_start(date), local_datetime(date, now.time()))
+            (day_start(date), day_start(now.date_naive()))
         }
         ReportPeriod::Week => {
             let days_from_monday = u64::from(now.date_naive().weekday().num_days_from_monday());
