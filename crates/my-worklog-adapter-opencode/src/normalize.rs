@@ -71,6 +71,7 @@ pub fn message_from_db_rows(
     part_data: &[String],
     fallback_session_id: &str,
     fallback_message_id: &str,
+    cwd: Option<String>,
     raw_ref: &str,
 ) -> Option<OpenCodeMessage> {
     let data = serde_json::from_str::<Value>(message_data).ok()?;
@@ -86,7 +87,7 @@ pub fn message_from_db_rows(
         role,
         timestamp: timestamp_from_value(&data),
         title: None,
-        cwd: None,
+        cwd,
         content: text,
         duration_ms: duration_ms_from_value(&data),
         raw_json: metrics_json_from_value(&data),

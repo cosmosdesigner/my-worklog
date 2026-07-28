@@ -1,9 +1,11 @@
+use std::collections::HashMap;
 use std::path::Path;
 
 use my_worklog_core::WorklogResult;
 use my_worklog_core::db::repositories::{ImportOutcome, insert_event};
 use my_worklog_core::privacy::redact::Redactor;
 use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
+use serde_json::Value;
 
 use crate::normalize::{message_from_db_rows, to_normalized_event};
 
@@ -34,6 +36,7 @@ fn import_modern_tables(
 ) -> WorklogResult<()> {
     let message_session_column = column_name(source, "message", &["sessionID", "session_id"])?;
     let part_message_column = column_name(source, "part", &["messageID", "message_id"])?;
+    let session_directories = session_directories(source)?;
     let mut stmt = source.prepare(&format!(
         "SELECT id, {message_session_column}, data FROM message ORDER BY rowid ASC"
     ))?;
@@ -48,9 +51,15 @@ fn import_modern_tables(
         let (message_id, session_id, message_data) = row?;
         let parts = part_data(source, &part_message_column, &message_id)?;
         let raw_ref = format!("{}:message:{message_id}", db_path.display());
-        if let Some(message) =
-            message_from_db_rows(&message_data, &parts, &session_id, &message_id, &raw_ref)
-        {
+        let cwd = session_directories.get(&session_id).cloned();
+        if let Some(message) = message_from_db_rows(
+            &message_data,
+            &parts,
+            &session_id,
+            &message_id,
+            cwd,
+            &raw_ref,
+        ) {
             let event = to_normalized_event(&message, redactor);
             if insert_event(worklog_conn, &event)? {
                 outcome.imported += 1;
@@ -60,6 +69,41 @@ fn import_modern_tables(
         }
     }
     Ok(())
+}
+
+fn session_directories(source: &Connection) -> WorklogResult<HashMap<String, String>> {
+    if !has_table(source, "session")? {
+        return Ok(HashMap::new());
+    }
+    let mut stmt = source.prepare("SELECT id, data FROM session")?;
+    let rows = stmt.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    let mut directories = HashMap::new();
+    for row in rows {
+        let (session_id, data) = row?;
+        if let Some(directory) = session_directory(&data) {
+            directories.insert(session_id, directory);
+        }
+    }
+    Ok(directories)
+}
+
+fn session_directory(data: &str) -> Option<String> {
+    let value = serde_json::from_str::<Value>(data).ok()?;
+    string_at(&value, &["directory", "cwd", "project_root"]).or_else(|| {
+        value
+            .get("info")
+            .and_then(|info| string_at(info, &["directory", "cwd", "project_root"]))
+    })
+}
+
+fn string_at(value: &Value, keys: &[&str]) -> Option<String> {
+    keys.iter()
+        .find_map(|key| value.get(*key).and_then(Value::as_str))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
 }
 
 fn part_data(
