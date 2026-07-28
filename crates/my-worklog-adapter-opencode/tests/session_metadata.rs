@@ -43,6 +43,11 @@ fn create_session_id_only_table(conn: &Connection) {
         .expect("create id-only session table");
 }
 
+fn create_session_directory_table(conn: &Connection) {
+    conn.execute_batch("CREATE TABLE session (id TEXT PRIMARY KEY, directory TEXT)")
+        .expect("create directory session table");
+}
+
 fn insert_session(conn: &Connection, id: &str, data: &str) {
     conn.execute(
         "INSERT INTO session (id, data) VALUES (?1, ?2)",
@@ -109,6 +114,44 @@ fn import_db_recovers_project_metadata_from_matching_session_row() {
         Some("/workspace/company/api")
     );
     assert_eq!(events[0].project_name.as_deref(), Some("api"));
+}
+
+#[test]
+fn import_db_recovers_project_metadata_from_session_directory_column() {
+    let dir = tempdir().expect("tempdir");
+    let opencode_db = dir.path().join("opencode.db");
+    let source = Connection::open(&opencode_db).expect("open source");
+    create_modern_source(&source);
+    create_session_directory_table(&source);
+    source
+        .execute(
+            "INSERT INTO session (id, directory) VALUES (?1, ?2)",
+            params!["ses_child", "/workspace/company/child"],
+        )
+        .expect("insert session directory");
+    insert_message(
+        &source,
+        "ses_child",
+        "msg_child",
+        "2026-07-24T09:00:00Z",
+        "Implemented child repository import",
+    );
+    drop(source);
+    let worklog = WorklogDb::open(&dir.path().join("worklog.sqlite")).expect("open worklog");
+
+    let outcome =
+        import_opencode_db(worklog.connection(), &opencode_db, &redactor()).expect("import");
+    let (start, end) = window();
+    let events = events_between(worklog.connection(), start, end).expect("events");
+
+    assert_eq!(outcome.imported, 1);
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].cwd.as_deref(), Some("/workspace/company/child"));
+    assert_eq!(
+        events[0].project_root.as_deref(),
+        Some("/workspace/company/child")
+    );
+    assert_eq!(events[0].project_name.as_deref(), Some("child"));
 }
 
 #[test]

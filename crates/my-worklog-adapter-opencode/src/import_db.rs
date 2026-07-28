@@ -72,9 +72,39 @@ fn import_modern_tables(
 }
 
 fn session_directories(source: &Connection) -> WorklogResult<HashMap<String, String>> {
-    if !has_table(source, "session")? || !has_columns(source, "session", &["id", "data"])? {
+    if !has_table(source, "session")? {
         return Ok(HashMap::new());
     }
+    let session_columns = columns(source, "session")?;
+    if !has_column(&session_columns, "id") {
+        return Ok(HashMap::new());
+    }
+    if has_column(&session_columns, "directory") {
+        return session_directories_from_column(source);
+    }
+    if !has_column(&session_columns, "data") {
+        return Ok(HashMap::new());
+    }
+
+    session_directories_from_data(source)
+}
+
+fn session_directories_from_column(source: &Connection) -> WorklogResult<HashMap<String, String>> {
+    let mut stmt = source.prepare("SELECT id, directory FROM session")?;
+    let rows = stmt.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?))
+    })?;
+    let mut directories = HashMap::new();
+    for row in rows {
+        let (session_id, directory) = row?;
+        if let Some(directory) = non_blank(directory.as_deref()) {
+            directories.insert(session_id, directory.to_owned());
+        }
+    }
+    Ok(directories)
+}
+
+fn session_directories_from_data(source: &Connection) -> WorklogResult<HashMap<String, String>> {
     let mut stmt = source.prepare("SELECT id, data FROM session")?;
     let rows = stmt.query_map([], |row| {
         Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
@@ -87,6 +117,10 @@ fn session_directories(source: &Connection) -> WorklogResult<HashMap<String, Str
         }
     }
     Ok(directories)
+}
+
+fn non_blank(value: Option<&str>) -> Option<&str> {
+    value.map(str::trim).filter(|value| !value.is_empty())
 }
 
 fn session_directory(data: &str) -> Option<String> {
@@ -119,9 +153,7 @@ fn part_data(
 }
 
 fn column_name(conn: &Connection, table: &str, candidates: &[&str]) -> WorklogResult<String> {
-    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
-    let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
-    let columns = rows.collect::<Result<Vec<_>, _>>()?;
+    let columns = columns(conn, table)?;
     let found = candidates
         .iter()
         .find(|candidate| columns.iter().any(|column| column == *candidate))
@@ -130,13 +162,14 @@ fn column_name(conn: &Connection, table: &str, candidates: &[&str]) -> WorklogRe
     Ok(found.to_owned())
 }
 
-fn has_columns(conn: &Connection, table: &str, required: &[&str]) -> WorklogResult<bool> {
+fn columns(conn: &Connection, table: &str) -> WorklogResult<Vec<String>> {
     let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
     let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
-    let columns = rows.collect::<Result<Vec<_>, _>>()?;
-    Ok(required
-        .iter()
-        .all(|required_column| columns.iter().any(|column| column == required_column)))
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+fn has_column(columns: &[String], name: &str) -> bool {
+    columns.iter().any(|column| column == name)
 }
 
 fn has_table(conn: &Connection, table: &str) -> WorklogResult<bool> {
