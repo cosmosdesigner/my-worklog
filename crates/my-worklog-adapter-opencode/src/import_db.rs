@@ -72,7 +72,7 @@ fn import_modern_tables(
 }
 
 fn session_directories(source: &Connection) -> WorklogResult<HashMap<String, String>> {
-    if !has_table(source, "session")? {
+    if !has_table(source, "session")? || !has_columns(source, "session", &["id", "data"])? {
         return Ok(HashMap::new());
     }
     let mut stmt = source.prepare("SELECT id, data FROM session")?;
@@ -128,6 +128,15 @@ fn column_name(conn: &Connection, table: &str, candidates: &[&str]) -> WorklogRe
         .copied()
         .unwrap_or(candidates[0]);
     Ok(found.to_owned())
+}
+
+fn has_columns(conn: &Connection, table: &str, required: &[&str]) -> WorklogResult<bool> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
+    let columns = rows.collect::<Result<Vec<_>, _>>()?;
+    Ok(required
+        .iter()
+        .all(|required_column| columns.iter().any(|column| column == required_column)))
 }
 
 fn has_table(conn: &Connection, table: &str) -> WorklogResult<bool> {

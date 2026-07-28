@@ -38,6 +38,11 @@ fn create_session_table(conn: &Connection) {
         .expect("create session table");
 }
 
+fn create_session_id_only_table(conn: &Connection) {
+    conn.execute_batch("CREATE TABLE session (id TEXT PRIMARY KEY)")
+        .expect("create id-only session table");
+}
+
 fn insert_session(conn: &Connection, id: &str, data: &str) {
     conn.execute(
         "INSERT INTO session (id, data) VALUES (?1, ?2)",
@@ -178,6 +183,34 @@ fn import_db_missing_session_metadata_remains_unknown_project() {
     let (start, end) = window();
     let events = events_between(worklog.connection(), start, end).expect("events");
 
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].project_root, None);
+    assert_eq!(project::label(&events[0]), "Unknown project");
+}
+
+#[test]
+fn import_db_ignores_session_table_without_data_column() {
+    let dir = tempdir().expect("tempdir");
+    let opencode_db = dir.path().join("opencode.db");
+    let source = Connection::open(&opencode_db).expect("open source");
+    create_modern_source(&source);
+    create_session_id_only_table(&source);
+    insert_message(
+        &source,
+        "ses_legacy",
+        "msg_legacy",
+        "2026-07-24T09:00:00Z",
+        "Import despite legacy session schema",
+    );
+    drop(source);
+    let worklog = WorklogDb::open(&dir.path().join("worklog.sqlite")).expect("open worklog");
+
+    let outcome =
+        import_opencode_db(worklog.connection(), &opencode_db, &redactor()).expect("import");
+    let (start, end) = window();
+    let events = events_between(worklog.connection(), start, end).expect("events");
+
+    assert_eq!(outcome.imported, 1);
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].project_root, None);
     assert_eq!(project::label(&events[0]), "Unknown project");
