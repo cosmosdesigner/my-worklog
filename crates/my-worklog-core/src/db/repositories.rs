@@ -52,8 +52,10 @@ pub struct StoredEvent {
 
 pub fn insert_event(conn: &Connection, event: &NormalizedSpoolEvent) -> WorklogResult<bool> {
     let now = Utc::now().to_rfc3339();
-    let project_id = event.project_root.as_ref().map(|path| stable_id(path));
-    if let (Some(id), Some(root)) = (&project_id, &event.project_root) {
+    let cwd = non_blank(event.cwd.as_deref());
+    let project_root = non_blank(event.project_root.as_deref());
+    let project_id = project_root.map(stable_id);
+    if let (Some(id), Some(root)) = (&project_id, project_root) {
         conn.execute(
             "INSERT OR IGNORE INTO project (id, root_path, name, git_remote, created_at, updated_at)
              VALUES (?1, ?2, ?3, NULL, ?4, ?4)",
@@ -72,22 +74,22 @@ pub fn insert_event(conn: &Connection, event: &NormalizedSpoolEvent) -> WorklogR
             project_id,
             event.title,
             optional_time(event.timestamp),
-            event.cwd,
+            cwd,
             event.raw_ref,
             now,
         ],
     )?;
     conn.execute(
         "UPDATE work_session
-         SET project_id = COALESCE(project_id, ?2),
-             cwd = COALESCE(cwd, ?3),
+         SET project_id = CASE WHEN project_id IS NULL THEN ?2 ELSE project_id END,
+             cwd = CASE WHEN NULLIF(TRIM(cwd), '') IS NULL THEN ?3 ELSE cwd END,
              last_seen_at = COALESCE(?4, last_seen_at),
              updated_at = ?5
-         WHERE id = ?1",
+          WHERE id = ?1",
         params![
             event.session_id,
             project_id,
-            event.cwd,
+            cwd,
             optional_time(event.timestamp),
             now,
         ],
@@ -106,7 +108,7 @@ pub fn insert_event(conn: &Connection, event: &NormalizedSpoolEvent) -> WorklogR
             event.event_type,
             event.role,
             optional_time(event.timestamp),
-            event.cwd,
+            cwd,
             event.title,
             event.content,
             event.normalized_content,
@@ -124,10 +126,11 @@ pub fn insert_event(conn: &Connection, event: &NormalizedSpoolEvent) -> WorklogR
     } else {
         conn.execute(
             "UPDATE work_event
-             SET duration_ms = COALESCE(duration_ms, ?2),
-                 raw_json = COALESCE(raw_json, ?3)
-             WHERE id = ?1",
-            params![event.event_id, event.duration_ms, event.raw_json],
+             SET cwd = CASE WHEN NULLIF(TRIM(cwd), '') IS NULL THEN ?2 ELSE cwd END,
+                 duration_ms = COALESCE(duration_ms, ?3),
+                 raw_json = COALESCE(raw_json, ?4)
+              WHERE id = ?1",
+            params![event.event_id, cwd, event.duration_ms, event.raw_json],
         )?;
     }
     Ok(changed == 1)
@@ -216,6 +219,10 @@ fn index_event(conn: &Connection, event: &NormalizedSpoolEvent) -> WorklogResult
 
 fn optional_time(value: Option<DateTime<Utc>>) -> Option<String> {
     value.map(|time| time.to_rfc3339())
+}
+
+fn non_blank(value: Option<&str>) -> Option<&str> {
+    value.map(str::trim).filter(|value| !value.is_empty())
 }
 
 fn project_name(root: &str) -> Option<String> {
