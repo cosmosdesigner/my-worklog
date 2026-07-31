@@ -30,7 +30,7 @@ Each line is a JSON object matching the normalized spool record. All fields are 
 - `command`: shell or harness command text.
 - `file_path`: file path associated with a file event.
 - `status`: event status when applicable.
-- `duration_ms`: duration in milliseconds when applicable.
+- `duration_ms`: event or step duration in milliseconds when applicable. This is per-event timing, not total session time or working time.
 
 Example:
 

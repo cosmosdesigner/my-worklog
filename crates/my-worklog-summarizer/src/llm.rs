@@ -49,7 +49,7 @@ impl SummaryAudience {
     const fn instruction(self) -> &'static str {
         match self {
             Self::Boss => {
-                "Write this as a manager-ready report with this exact structure:\nTitle: one clear line summarizing the period.\nDetailed explanation: 1-3 concise paragraphs explaining what was done, why it matters, and validation/blockers when present.\nDecisions: bullet list of decisions made, or 'None captured' if absent.\nFeatures: bullet list of features or improvements delivered, or 'None captured' if absent.\nBugs fixed: bullet list of bugs/debugging/fixes, or 'None captured' if absent.\nMetrics: bullet list with token count and total time spent when present in the source context, or 'Not available' if absent."
+                "Write this as a manager-ready report with this exact structure:\nTitle: one clear line summarizing the period.\nDetailed explanation: 1-3 concise paragraphs explaining what was done, why it matters, and validation/blockers when present.\nDecisions: bullet list of decisions made, or 'None captured' if absent.\nFeatures: bullet list of features or improvements delivered, or 'None captured' if absent.\nBugs fixed: bullet list of bugs/debugging/fixes, or 'None captured' if absent.\nMetrics: bullet list with event counts, Captured agent-session time, and token usage when present in the source context, or 'Not available' if absent. Never ask for aggregate work time or infer total work time."
             }
             Self::Client => {
                 "Write this as a concise client-facing update. Use 2 short paragraphs. Emphasize value delivered and next steps. Do not expose internal tooling noise."
@@ -142,9 +142,9 @@ mod tests {
     }
 
     #[test]
-    fn boss_prompt_requires_report_sections_for_decisions_features_bugs_and_metrics() {
+    fn boss_prompt_requires_captured_agent_session_metrics_and_rejects_total_time_spent() {
         let input = build_summary_input(
-            "## Metrics\n- Total time: 2h 05m 00s\n- Tokens: 12,300 total (8,000 input, 4,300 output)\n\n- User: fixed importer bug",
+            "## Captured agent session\n- Captured agent-session time: 2h 05m 00s\n- Tokens: 12,300 total (8,000 input, 4,300 output)\n\n- User: fixed importer bug",
             SummaryAudience::Boss,
         );
 
@@ -154,7 +154,8 @@ mod tests {
         assert!(input.contains("Features:"));
         assert!(input.contains("Bugs fixed:"));
         assert!(input.contains("Metrics:"));
-        assert!(input.contains("token count and total time spent"));
+        assert!(input.contains("Captured agent-session time"));
+        assert!(!input.contains("total time spent"));
     }
 
     #[test]

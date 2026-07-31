@@ -44,11 +44,11 @@ enum Command {
     Install(commands::install::InstallArgs),
     #[command(about = "Import captured work events or agent transcripts")]
     Import(commands::import::ImportArgs),
-    #[command(about = "Show today's human-readable work report")]
+    #[command(about = "Show today's captured work events")]
     Today,
-    #[command(about = "Show yesterday's human-readable work report")]
+    #[command(about = "Show yesterday's captured work events")]
     Yesterday,
-    #[command(about = "Show this week's human-readable work report")]
+    #[command(about = "Show this week's captured work events")]
     Week,
     #[command(about = "Search human-readable work events")]
     Search(commands::search::SearchArgs),
@@ -56,7 +56,7 @@ enum Command {
     Share(commands::share::ShareArgs),
     #[command(about = "Show a compact local status dashboard")]
     Status(commands::status::Args),
-    #[command(about = "Show completed work found in local work events")]
+    #[command(about = "Show completed captured work events")]
     Done(commands::done::Args),
     #[command(about = "Show decisions found in local work events")]
     Decisions(commands::decisions::Args),
@@ -118,4 +118,26 @@ fn init_tracing(verbose: u8) {
         .compact()
         .with_writer(std::io::stderr)
         .init();
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::CommandFactory;
+
+    use super::Cli;
+
+    #[test]
+    fn report_commands_describe_captured_work_events() {
+        let command = Cli::command();
+        for name in ["today", "yesterday", "week", "done"] {
+            let about = command
+                .find_subcommand(name)
+                .expect("subcommand")
+                .get_about()
+                .expect("about")
+                .to_string();
+            assert!(about.contains("captured work events"));
+            assert!(!about.contains("human-readable work report"));
+        }
+    }
 }
