@@ -9,6 +9,9 @@ use my_worklog_core::report::insights::{self, ReportPeriod};
 use my_worklog_core::report::{daily, weekly};
 use tempfile::tempdir;
 
+const CAPTURED_AGENT_SESSION_TIME: &str = "Captured agent-session time";
+const COVERAGE_DISCLOSURE: &str = "Coverage: captured coding-agent events only; meetings, manual coding, review, planning, browser work, and other uncaptured activity are excluded.";
+
 fn timestamp(date: NaiveDate, hour: u32, minute: u32) -> String {
     Local
         .with_ymd_and_hms(date.year(), date.month(), date.day(), hour, minute, 0)
@@ -76,7 +79,7 @@ fn day_and_week_reports_group_worked_projects_without_sibling_discovery() {
     fs::write(
         spool.join("events.jsonl"),
         r#"{"source_agent":"opencode","source_session_id":"api","source_event_id":"api-1","type":"user_prompt","role":"user","timestamp":"2026-07-24T09:00:00Z","project_root":"/workspace/company/api","cwd":"/workspace/company/api","content":"Plan API route"}
-{"source_agent":"opencode","source_session_id":"web","source_event_id":"web-1","type":"assistant_message","role":"assistant","timestamp":"2026-07-24T09:01:00Z","project_root":"/workspace/company/web","cwd":"/workspace/company/web","content":"Implemented web UI"}
+{"source_agent":"opencode","source_session_id":"web","source_event_id":"web-1","type":"assistant_message","role":"assistant","timestamp":"2026-07-24T09:01:00Z","project_root":"/workspace/company/web","cwd":"/workspace/company/web","content":"Implemented web UI","duration_ms":123000}
 {"source_agent":"opencode","source_session_id":"ops","source_event_id":"ops-1","type":"command","timestamp":"2026-07-24T09:02:00Z","project_root":"/workspace/company/ops","cwd":"/workspace/company/ops","command":"terraform plan","content":"terraform plan"}
 "#,
     )
@@ -99,6 +102,9 @@ fn day_and_week_reports_group_worked_projects_without_sibling_discovery() {
         assert!(report.contains("- api: 1 events"));
         assert!(report.contains("- web: 1 events"));
         assert!(report.contains("- ops: 1 events"));
+        assert!(report.contains(&format!("- {CAPTURED_AGENT_SESSION_TIME}: 2m 03s")));
+        assert_eq!(report.matches(COVERAGE_DISCLOSURE).count(), 1);
+        assert!(!report.contains("- Total time:"));
         assert!(report.contains("## Main work"));
         assert!(report.contains("### api"));
         assert!(report.contains("User: Plan API route [opencode]"));

@@ -189,7 +189,11 @@ fn import_db_preserves_assistant_token_and_timing_metrics() {
         chrono::NaiveDate::from_ymd_opt(2026, 7, 24).expect("valid date"),
     )
     .expect("render day");
-    assert!(report.contains("- Total time: 0m 05s"));
+    assert!(report.contains("- Captured agent-session time: 0m 05s"));
+    assert_eq!(
+        report.matches("Coverage: captured coding-agent events only; meetings, manual coding, review, planning, browser work, and other uncaptured activity are excluded.").count(),
+        1
+    );
     assert!(report.contains("- Tokens: 1,545 total (1,200 input, 345 output)"));
 }
 

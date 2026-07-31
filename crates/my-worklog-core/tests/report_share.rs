@@ -6,6 +6,9 @@ use my_worklog_core::privacy::redact::Redactor;
 use my_worklog_core::report::daily;
 use tempfile::tempdir;
 
+const CAPTURED_AGENT_SESSION_TIME: &str = "Captured agent-session time";
+const COVERAGE_DISCLOSURE: &str = "Coverage: captured coding-agent events only; meetings, manual coding, review, planning, browser work, and other uncaptured activity are excluded.";
+
 #[test]
 fn report_shows_metrics_when_events_store_duration_and_tokens() {
     let dir = tempdir().expect("tempdir");
@@ -31,7 +34,9 @@ fn report_shows_metrics_when_events_store_duration_and_tokens() {
     assert!(report.contains("- Assistant messages: 1"));
     assert!(report.contains("- Commands: 0"));
     assert!(report.contains("- File events: 0"));
-    assert!(report.contains("- Total time: 2m 03s"));
+    assert!(report.contains(&format!("- {CAPTURED_AGENT_SESSION_TIME}: 2m 03s")));
+    assert_eq!(report.matches(COVERAGE_DISCLOSURE).count(), 1);
+    assert!(!report.contains("- Total time:"));
     assert!(report.contains("- Tokens: 1,234 total (900 input, 334 output)"));
     assert!(!report.contains("\"usage\""));
 }
@@ -61,7 +66,9 @@ fn report_metrics_include_unavailable_time_and_tokens() {
     assert!(report.contains("- Assistant messages: 0"));
     assert!(report.contains("- Commands: 0"));
     assert!(report.contains("- File events: 0"));
-    assert!(report.contains("- Total time: Not available"));
+    assert!(report.contains(&format!("- {CAPTURED_AGENT_SESSION_TIME}: Not available")));
+    assert_eq!(report.matches(COVERAGE_DISCLOSURE).count(), 1);
+    assert!(!report.contains("- Total time:"));
     assert!(report.contains("- Tokens: Not available"));
 }
 

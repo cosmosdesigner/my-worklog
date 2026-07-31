@@ -7,6 +7,9 @@ use my_worklog_core::privacy::redact::Redactor;
 use my_worklog_core::report::insights::{self, ReportPeriod};
 use tempfile::tempdir;
 
+const CAPTURED_AGENT_SESSION_TIME: &str = "Captured agent-session time";
+const COVERAGE_DISCLOSURE: &str = "Coverage: captured coding-agent events only; meetings, manual coding, review, planning, browser work, and other uncaptured activity are excluded.";
+
 fn timestamp(date: NaiveDate, hour: u32, minute: u32) -> String {
     Local
         .with_ymd_and_hms(date.year(), date.month(), date.day(), hour, minute, 0)
@@ -51,7 +54,9 @@ fn insight_reports_filter_local_work_events_and_keep_metrics() {
 
     assert!(decisions.contains("# Decisions - yesterday"));
     assert!(decisions.contains("Decision: use local SQLite for reports"));
-    assert!(decisions.contains("- Total time: 0m 05s"));
+    assert!(decisions.contains(&format!("- {CAPTURED_AGENT_SESSION_TIME}: 0m 05s")));
+    assert_eq!(decisions.matches(COVERAGE_DISCLOSURE).count(), 1);
+    assert!(!decisions.contains("- Total time:"));
     assert!(decisions.contains("- Tokens: 125 total (100 input, 25 output)"));
     assert!(open_loops.contains("Next follow up is adding open loops"));
     assert!(blockers.contains("Blocked by missing adapter data"));
@@ -106,6 +111,9 @@ fn insight_reports_group_duplicates_and_status_suppresses_noise() {
     assert!(status.contains("Decision: use SQLite for local reports (2 events) [opencode]"));
     assert!(status.contains("## Open loops"));
     assert!(status.contains("TODO: follow up on OpenCode tool install [opencode]"));
+    assert!(status.contains(&format!("- {CAPTURED_AGENT_SESSION_TIME}: 0m 05s")));
+    assert_eq!(status.matches(COVERAGE_DISCLOSURE).count(), 1);
+    assert!(!status.contains("- Total time:"));
     assert!(status.contains("- src/report.rs: 2 events"));
     assert!(status.contains("- cargo test: 2 runs"));
     assert!(status.contains("- opencode: 9 events"));
@@ -121,7 +129,7 @@ fn done_report_groups_completed_work_and_status_includes_it() {
     fs::write(
         spool.join("events.jsonl"),
         format!(
-            "{{\"source_agent\":\"opencode\",\"source_session_id\":\"s3\",\"source_event_id\":\"done-1\",\"type\":\"assistant_message\",\"role\":\"assistant\",\"timestamp\":\"{}\",\"content\":\"Completed: added local status dashboard\"}}\n{{\"source_agent\":\"opencode\",\"source_session_id\":\"s3\",\"source_event_id\":\"done-2\",\"type\":\"assistant_message\",\"role\":\"assistant\",\"timestamp\":\"{}\",\"content\":\"Finished: added local status dashboard\"}}\n{{\"source_agent\":\"opencode\",\"source_session_id\":\"s3\",\"source_event_id\":\"fix\",\"type\":\"assistant_message\",\"role\":\"assistant\",\"timestamp\":\"{}\",\"content\":\"Fixed OpenCode helper generation\"}}\n{{\"source_agent\":\"opencode\",\"source_session_id\":\"s3\",\"source_event_id\":\"loop\",\"type\":\"assistant_message\",\"role\":\"assistant\",\"timestamp\":\"{}\",\"content\":\"TODO: write docs next\"}}\n",
+            "{{\"source_agent\":\"opencode\",\"source_session_id\":\"s3\",\"source_event_id\":\"done-1\",\"type\":\"assistant_message\",\"role\":\"assistant\",\"timestamp\":\"{}\",\"content\":\"Completed: added local status dashboard\",\"duration_ms\":5000}}\n{{\"source_agent\":\"opencode\",\"source_session_id\":\"s3\",\"source_event_id\":\"done-2\",\"type\":\"assistant_message\",\"role\":\"assistant\",\"timestamp\":\"{}\",\"content\":\"Finished: added local status dashboard\"}}\n{{\"source_agent\":\"opencode\",\"source_session_id\":\"s3\",\"source_event_id\":\"fix\",\"type\":\"assistant_message\",\"role\":\"assistant\",\"timestamp\":\"{}\",\"content\":\"Fixed OpenCode helper generation\"}}\n{{\"source_agent\":\"opencode\",\"source_session_id\":\"s3\",\"source_event_id\":\"loop\",\"type\":\"assistant_message\",\"role\":\"assistant\",\"timestamp\":\"{}\",\"content\":\"TODO: write docs next\"}}\n",
             timestamp(yesterday, 10, 0),
             timestamp(yesterday, 10, 1),
             timestamp(yesterday, 10, 2),
@@ -139,9 +147,15 @@ fn done_report_groups_completed_work_and_status_includes_it() {
     assert!(done.contains("# Done - yesterday"));
     assert!(done.contains("Completed: added local status dashboard (2 events) [opencode]"));
     assert!(done.contains("Fixed OpenCode helper generation [opencode]"));
+    assert!(done.contains(&format!("- {CAPTURED_AGENT_SESSION_TIME}: 0m 05s")));
+    assert_eq!(done.matches(COVERAGE_DISCLOSURE).count(), 1);
+    assert!(!done.contains("- Total time:"));
     assert!(!done.contains("TODO: write docs next"));
     assert!(status.contains("## Completed work"));
     assert!(status.contains("Completed: added local status dashboard (2 events) [opencode]"));
+    assert!(status.contains(&format!("- {CAPTURED_AGENT_SESSION_TIME}: 0m 05s")));
+    assert_eq!(status.matches(COVERAGE_DISCLOSURE).count(), 1);
+    assert!(!status.contains("- Total time:"));
 }
 
 #[test]

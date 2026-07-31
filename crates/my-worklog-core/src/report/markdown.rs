@@ -131,8 +131,9 @@ fn render_summary(title: &str, events: &[StoredEvent]) -> String {
     let tokens = metrics
         .token_label()
         .unwrap_or_else(|| "Not available".to_string());
-    output.push_str(&format!("- Total time: {duration}\n"));
-    output.push_str(&format!("- Tokens: {tokens}\n\n"));
+    output.push_str(&format!("- Captured agent-session time: {duration}\n"));
+    output.push_str(&format!("- Tokens: {tokens}\n"));
+    output.push_str("Coverage: captured coding-agent events only; meetings, manual coding, review, planning, browser work, and other uncaptured activity are excluded.\n\n");
     output
 }
 

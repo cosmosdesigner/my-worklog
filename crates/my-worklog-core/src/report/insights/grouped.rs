@@ -7,6 +7,8 @@ use crate::report::display::event_metrics;
 use crate::report::insights::ReportPeriod;
 use crate::report::project;
 
+const COVERAGE_DISCLOSURE: &str = "Coverage: captured coding-agent events only; meetings, manual coding, review, planning, browser work, and other uncaptured activity are excluded.";
+
 pub(super) use self::items::TextOptions;
 use self::items::{count_items, text_items};
 
@@ -93,7 +95,7 @@ fn status_with(
         .collect::<BTreeSet<_>>()
         .len();
     let mut output = format!(
-        "# Status - {}\n\n## At a glance\n- Events: {}\n- Sessions: {sessions}\n- Total time: {duration}\n- Tokens: {tokens}\n",
+        "# Status - {}\n\n## At a glance\n- Events: {}\n- Sessions: {sessions}\n- Captured agent-session time: {duration}\n- Tokens: {tokens}\n{COVERAGE_DISCLOSURE}\n",
         period.label(),
         events.len()
     );
@@ -147,7 +149,7 @@ fn header(title: &str, period: ReportPeriod, events: &[StoredEvent]) -> String {
         .token_label()
         .unwrap_or_else(|| "Not available".to_string());
     format!(
-        "# {title} - {}\n\n## Metrics\n- Events: {}\n- Total time: {duration}\n- Tokens: {tokens}\n\n## Results\n",
+        "# {title} - {}\n\n## Metrics\n- Events: {}\n- Captured agent-session time: {duration}\n- Tokens: {tokens}\n{COVERAGE_DISCLOSURE}\n\n## Results\n",
         period.label(),
         events.len()
     )
