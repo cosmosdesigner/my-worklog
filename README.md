@@ -154,7 +154,7 @@ my-worklog agents --period week
 
 `--period` supports `today`, `yesterday`, and `week`. The default is `week`. `status` defaults to `today`; the other insight commands default to `week`.
 
-These commands filter and group human-readable events, then include available metrics such as event counts, captured agent-session time, and token usage. Captured agent-session time is the time recorded in the session, not total work time. `done` answers what completed in the selected period. `status` gives a dashboard with blockers, decisions, open loops, completed work, file activity, command activity, and source-agent counts. Add `--compact` to `status` or `done` for shorter top-item lists and truncated bullets suitable for OpenCode answers.
+These commands filter and group human-readable events, then include available metrics such as event counts, captured agent-session time, and token usage. Captured agent-session time is the time recorded in the session, not total work time. Manual entries can record meetings, planning, reviews, QA, communication, and other uncaptured work; reports show manual time and total accounted time separately. `done` answers what completed in the selected period. `status` gives a dashboard with blockers, decisions, open loops, completed work, file activity, command activity, and source-agent counts. Add `--compact` to `status` or `done` for shorter top-item lists and truncated bullets suitable for OpenCode answers.
 
 When a period contains work from multiple captured project roots, local period and insight reports add a `Projects` summary and group the worked events under project subsections. Project labels come from captured project metadata or the basename of the captured root/cwd; MyWorklog does not scan parent folders or list sibling repositories that had no captured events.
 
@@ -171,6 +171,8 @@ my-worklog today
 my-worklog yesterday
 my-worklog week
 my-worklog search "database migration"
+my-worklog manual add --start "2026-07-27T10:00:00Z" --duration 2h --project "my-worklog" --category meeting --description "Project planning"
+my-worklog manual list --period today
 my-worklog status --period week --compact
 my-worklog done --period week --compact
 my-worklog decisions --period yesterday
@@ -180,6 +182,7 @@ my-worklog files --period week
 my-worklog commands --period yesterday
 my-worklog agents --period week
 my-worklog export events --jsonl
+my-worklog export manual --jsonl
 my-worklog share yesterday
 ```
 

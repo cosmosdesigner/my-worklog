@@ -5,6 +5,7 @@ use rusqlite::Connection;
 
 use crate::db::repositories::{StoredEvent, events_between};
 use crate::error::WorklogResult;
+use crate::manual::{ManualEntry, list_between};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ReportPeriod {
@@ -73,17 +74,33 @@ pub fn agents(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> 
 
 pub fn status(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> {
     let events = period_events(conn, period)?;
-    Ok(grouped::status(period, &events, grouped::TextOptions::FULL))
+    let manual = period_manual(conn, period)?;
+    let mut report = grouped::status(period, &events, grouped::TextOptions::FULL);
+    append_manual_status(&mut report, &manual);
+    Ok(report)
 }
 
 pub fn status_compact(conn: &Connection, period: ReportPeriod) -> WorklogResult<String> {
     let events = period_events(conn, period)?;
-    Ok(grouped::status_compact(period, &events))
+    let manual = period_manual(conn, period)?;
+    let mut report = grouped::status_compact(period, &events);
+    append_manual_status(&mut report, &manual);
+    Ok(report)
 }
 
 fn period_events(conn: &Connection, period: ReportPeriod) -> WorklogResult<Vec<StoredEvent>> {
+    let (start, end) = period_bounds(period);
+    events_between(conn, start.with_timezone(&Utc), end.with_timezone(&Utc))
+}
+
+fn period_manual(conn: &Connection, period: ReportPeriod) -> WorklogResult<Vec<ManualEntry>> {
+    let (start, end) = period_bounds(period);
+    list_between(conn, start.with_timezone(&Utc), end.with_timezone(&Utc))
+}
+
+fn period_bounds(period: ReportPeriod) -> (chrono::DateTime<Local>, chrono::DateTime<Local>) {
     let now = Local::now();
-    let (start, end) = match period {
+    match period {
         ReportPeriod::Today => (day_start(now.date_naive()), now),
         ReportPeriod::Yesterday => {
             let date = now.date_naive() - Days::new(1);
@@ -96,8 +113,29 @@ fn period_events(conn: &Connection, period: ReportPeriod) -> WorklogResult<Vec<S
                 now,
             )
         }
-    };
-    events_between(conn, start.with_timezone(&Utc), end.with_timezone(&Utc))
+    }
+}
+
+fn append_manual_status(report: &mut String, manual: &[ManualEntry]) {
+    let minutes: i64 = manual
+        .iter()
+        .map(|entry| (entry.end - entry.start).num_minutes())
+        .sum();
+    report.push_str("\n## Manual activity\n");
+    report.push_str(&format!("- Entries: {}\n", manual.len()));
+    report.push_str(&format!(
+        "- Manual time: {}h {:02}m\n",
+        minutes / 60,
+        minutes % 60
+    ));
+    if manual
+        .windows(2)
+        .any(|entries| entries[1].start < entries[0].end)
+    {
+        report.push_str(
+            "- Warning: overlapping manual entries detected; durations were not changed.\n",
+        );
+    }
 }
 
 fn day_start(date: NaiveDate) -> chrono::DateTime<Local> {

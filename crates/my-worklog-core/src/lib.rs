@@ -3,6 +3,7 @@ pub mod db;
 pub mod error;
 pub mod git;
 pub mod ingest;
+pub mod manual;
 pub mod model;
 pub mod paths;
 pub mod privacy;

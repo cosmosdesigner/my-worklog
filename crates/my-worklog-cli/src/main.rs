@@ -73,6 +73,8 @@ enum Command {
     Commands(commands::command_activity::Args),
     #[command(about = "Show source-agent activity counts")]
     Agents(commands::agents::Args),
+    #[command(about = "Manage manually recorded work")]
+    Manual(commands::manual::ManualArgs),
 }
 
 fn main() -> Result<()> {
@@ -99,6 +101,7 @@ fn main() -> Result<()> {
         Command::Files(args) => commands::files::run(&context, &args),
         Command::Commands(args) => commands::command_activity::run(&context, &args),
         Command::Agents(args) => commands::agents::run(&context, &args),
+        Command::Manual(args) => commands::manual::run(&context, &args),
     }
 }
 

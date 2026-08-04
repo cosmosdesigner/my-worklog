@@ -1,4 +1,4 @@
-pub const CURRENT_VERSION: i32 = 1;
+pub const CURRENT_VERSION: i32 = 2;
 
 pub const SCHEMA_SQL: &str = r#"
 PRAGMA foreign_keys = ON;

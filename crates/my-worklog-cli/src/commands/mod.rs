@@ -17,6 +17,7 @@ pub mod files;
 pub mod import;
 pub mod init;
 pub mod install;
+pub mod manual;
 pub mod open_loops;
 pub mod search;
 pub mod share;

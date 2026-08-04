@@ -3,7 +3,10 @@ use rusqlite::Connection;
 
 use crate::db::repositories::events_between;
 use crate::error::WorklogResult;
-use crate::report::markdown::{render_full_report, render_report, render_share_context};
+use crate::manual::list_between;
+use crate::report::markdown::{
+    render_full_report_with_manual, render_report_with_manual, render_share_context_with_manual,
+};
 
 pub fn week(conn: &Connection) -> WorklogResult<String> {
     render_week_at(conn, Local::now(), WeekOutput::Terminal)
@@ -51,15 +54,18 @@ fn render_week_at(
         LocalResult::Ambiguous(earliest, _) => earliest,
         LocalResult::None => Utc.from_utc_datetime(&midnight).with_timezone(&Local),
     };
-    let events = events_between(conn, start.with_timezone(&Utc), end.with_timezone(&Utc))?;
+    let start = start.with_timezone(&Utc);
+    let end = end.with_timezone(&Utc);
+    let events = events_between(conn, start, end)?;
+    let manual = list_between(conn, start, end)?;
     let title = format!(
         "Weekly Worklog - {}-W{:02}",
         today.year(),
         today.iso_week().week()
     );
     match output {
-        WeekOutput::Terminal => Ok(render_report(&title, &events)),
-        WeekOutput::Full => Ok(render_full_report(&title, &events)),
-        WeekOutput::Share => Ok(render_share_context(&title, &events)),
+        WeekOutput::Terminal => Ok(render_report_with_manual(&title, &events, &manual)),
+        WeekOutput::Full => Ok(render_full_report_with_manual(&title, &events, &manual)),
+        WeekOutput::Share => Ok(render_share_context_with_manual(&title, &events, &manual)),
     }
 }

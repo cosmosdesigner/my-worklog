@@ -857,6 +857,7 @@ name = "my-worklog-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "directories",
  "my-worklog-adapter-opencode",

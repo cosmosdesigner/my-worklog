@@ -3,7 +3,10 @@ use rusqlite::Connection;
 
 use crate::db::repositories::events_between;
 use crate::error::WorklogResult;
-use crate::report::markdown::{render_full_report, render_report, render_share_context};
+use crate::manual::list_between;
+use crate::report::markdown::{
+    render_full_report_with_manual, render_report_with_manual, render_share_context_with_manual,
+};
 
 pub fn today(conn: &Connection) -> WorklogResult<String> {
     let now = Local::now();
@@ -56,7 +59,12 @@ pub fn render_share_yesterday_until(
 pub fn render_day(conn: &Connection, date: NaiveDate) -> WorklogResult<String> {
     let (start, end) = day_window(date);
     let events = events_between(conn, start, end)?;
-    Ok(render_report(&format!("Worklog - {date}"), &events))
+    let manual = list_between(conn, start, end)?;
+    Ok(render_report_with_manual(
+        &format!("Worklog - {date}"),
+        &events,
+        &manual,
+    ))
 }
 
 pub fn render_day_until(
@@ -65,20 +73,36 @@ pub fn render_day_until(
     end: DateTime<Local>,
 ) -> WorklogResult<String> {
     let (start, _) = day_window(date);
-    let events = events_between(conn, start, end.with_timezone(&Utc))?;
-    Ok(render_report(&format!("Worklog - {date}"), &events))
+    let end = end.with_timezone(&Utc);
+    let events = events_between(conn, start, end)?;
+    let manual = list_between(conn, start, end)?;
+    Ok(render_report_with_manual(
+        &format!("Worklog - {date}"),
+        &events,
+        &manual,
+    ))
 }
 
 pub fn render_full_day(conn: &Connection, date: NaiveDate) -> WorklogResult<String> {
     let (start, end) = day_window(date);
     let events = events_between(conn, start, end)?;
-    Ok(render_full_report(&format!("Worklog - {date}"), &events))
+    let manual = list_between(conn, start, end)?;
+    Ok(render_full_report_with_manual(
+        &format!("Worklog - {date}"),
+        &events,
+        &manual,
+    ))
 }
 
 pub fn render_share_day(conn: &Connection, date: NaiveDate) -> WorklogResult<String> {
     let (start, end) = day_window(date);
     let events = events_between(conn, start, end)?;
-    Ok(render_share_context(&format!("Worklog - {date}"), &events))
+    let manual = list_between(conn, start, end)?;
+    Ok(render_share_context_with_manual(
+        &format!("Worklog - {date}"),
+        &events,
+        &manual,
+    ))
 }
 
 pub fn render_full_day_until(
@@ -87,8 +111,14 @@ pub fn render_full_day_until(
     end: DateTime<Local>,
 ) -> WorklogResult<String> {
     let (start, _) = day_window(date);
-    let events = events_between(conn, start, end.with_timezone(&Utc))?;
-    Ok(render_full_report(&format!("Worklog - {date}"), &events))
+    let end = end.with_timezone(&Utc);
+    let events = events_between(conn, start, end)?;
+    let manual = list_between(conn, start, end)?;
+    Ok(render_full_report_with_manual(
+        &format!("Worklog - {date}"),
+        &events,
+        &manual,
+    ))
 }
 
 pub fn render_share_day_until(
@@ -97,8 +127,14 @@ pub fn render_share_day_until(
     end: DateTime<Local>,
 ) -> WorklogResult<String> {
     let (start, _) = day_window(date);
-    let events = events_between(conn, start, end.with_timezone(&Utc))?;
-    Ok(render_share_context(&format!("Worklog - {date}"), &events))
+    let end = end.with_timezone(&Utc);
+    let events = events_between(conn, start, end)?;
+    let manual = list_between(conn, start, end)?;
+    Ok(render_share_context_with_manual(
+        &format!("Worklog - {date}"),
+        &events,
+        &manual,
+    ))
 }
 
 fn day_window(date: NaiveDate) -> (DateTime<Utc>, DateTime<Utc>) {
